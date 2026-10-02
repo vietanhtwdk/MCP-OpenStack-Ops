@@ -6,13 +6,14 @@ including creating, updating, deleting, and querying health monitors.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any
+
 from ...connection import get_openstack_connection
 
 logger = logging.getLogger(__name__)
 
 
-def get_load_balancer_health_monitors(pool_name_or_id: str = "") -> Dict[str, Any]:
+def get_load_balancer_health_monitors(pool_name_or_id: str = "") -> dict[str, Any]:
     """
     Get health monitors, optionally filtered by pool.
     
@@ -78,7 +79,7 @@ def get_load_balancer_health_monitors(pool_name_or_id: str = "") -> Dict[str, An
         logger.error(f"Failed to get health monitors: {e}")
         return {
             'success': False,
-            'message': f'Failed to get health monitors: {str(e)}',
+            'message': f'Failed to get health monitors: {e!s}',
             'error': str(e)
         }
 
@@ -88,7 +89,7 @@ def set_load_balancer_health_monitor(action: str, monitor_name_or_id: str = "", 
                                    delay: int = 10, timeout: int = 5, max_retries: int = 3,
                                    max_retries_down: int = 3, admin_state_up: bool = True,
                                    http_method: str = "GET", url_path: str = "/",
-                                   expected_codes: str = "200") -> Dict[str, Any]:
+                                   expected_codes: str = "200") -> dict[str, Any]:
     """
     Manage load balancer health monitor operations.
     
@@ -157,7 +158,7 @@ def set_load_balancer_health_monitor(action: str, monitor_name_or_id: str = "", 
             
             return {
                 'success': True,
-                'message': f'Health monitor created successfully',
+                'message': 'Health monitor created successfully',
                 'health_monitor': {
                     'id': monitor.id,
                     'name': getattr(monitor, 'name', ''),
@@ -195,7 +196,7 @@ def set_load_balancer_health_monitor(action: str, monitor_name_or_id: str = "", 
             
             return {
                 'success': True,
-                'message': f'Health monitor deleted successfully'
+                'message': 'Health monitor deleted successfully'
             }
             
         elif action == "show":
@@ -287,7 +288,7 @@ def set_load_balancer_health_monitor(action: str, monitor_name_or_id: str = "", 
             
             return {
                 'success': True,
-                'message': f'Health monitor updated successfully',
+                'message': 'Health monitor updated successfully',
                 'health_monitor': {
                     'id': updated_monitor.id,
                     'name': getattr(updated_monitor, 'name', ''),
@@ -311,6 +312,6 @@ def set_load_balancer_health_monitor(action: str, monitor_name_or_id: str = "", 
         logger.error(f"Failed to manage health monitor: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage health monitor: {str(e)}',
+            'message': f'Failed to manage health monitor: {e!s}',
             'error': str(e)
         }

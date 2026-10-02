@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_project_details as _get_project_details
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_project_details(project_name: str = "") -> str:
@@ -39,6 +41,6 @@ async def get_project_details(project_name: str = "") -> str:
         return json.dumps(response, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to get project details - {str(e)}"
+        error_msg = f"Error: Failed to get project details - {e!s}"
         logger.error(error_msg)
         return error_msg

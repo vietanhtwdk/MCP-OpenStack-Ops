@@ -18,3 +18,9 @@ wheels/
 .vscode*
 #.github/copilot-instructions.md
 *.swp
+
+# Company-internal tooling / infra notes - not for this fork
+.githooks/
+audit-prompt.md
+hypervisorissue.md
+issue.md

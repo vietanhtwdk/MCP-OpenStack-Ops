@@ -1,11 +1,13 @@
 """Tool implementation for set_volume_backups."""
 
 import json
+
 from ..functions import set_volume_backups as _set_volume_backups
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_volume_backups(
@@ -35,7 +37,7 @@ async def set_volume_backups(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -51,6 +53,6 @@ async def set_volume_backups(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage volume backup: {str(e)}',
+            'message': f'Failed to manage volume backup: {e!s}',
             'error': str(e)
         }, indent=2)

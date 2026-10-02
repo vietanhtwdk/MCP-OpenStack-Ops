@@ -7,14 +7,15 @@ creation, deletion, and basic load balancer operations.
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Any, Optional
-from ...connection import get_openstack_connection
+from typing import Any
+
+from ...connection import get_openstack_connection, is_all_projects_allowed
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
-def get_load_balancer_list(limit: int = 50, offset: int = 0, include_all: bool = False) -> Dict[str, Any]:
+def get_load_balancer_list(limit: int = 50, offset: int = 0, include_all: bool = False) -> dict[str, Any]:
     """
     Get list of load balancers with comprehensive details for current project.
     
@@ -36,11 +37,15 @@ def get_load_balancer_list(limit: int = 50, offset: int = 0, include_all: bool =
         # Validate limit
         if not include_all:
             limit = max(1, min(limit, 200))
-        
+
+        all_projects = is_all_projects_allowed()
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - skipping per-project filtering for load balancers")
+
         # Get all load balancers and filter by current project
         all_lbs = []
         for lb in conn.load_balancer.load_balancers():
-            if getattr(lb, 'project_id', None) == current_project_id:
+            if all_projects or getattr(lb, 'project_id', None) == current_project_id:
                 all_lbs.append(lb)
         
         # Apply pagination
@@ -97,7 +102,7 @@ def get_load_balancer_list(limit: int = 50, offset: int = 0, include_all: bool =
                     'provisioning_status': getattr(lb, 'provisioning_status', 'Unknown'),
                     'operating_status': getattr(lb, 'operating_status', 'Unknown'),
                     'project_id': getattr(lb, 'project_id', current_project_id),
-                    'error': f'Failed to fetch details: {str(e)}'
+                    'error': f'Failed to fetch details: {e!s}'
                 })
         
         end_time = datetime.now()
@@ -126,12 +131,12 @@ def get_load_balancer_list(limit: int = 50, offset: int = 0, include_all: bool =
         logger.error(f"Failed to get load balancers: {e}")
         return {
             'success': False,
-            'message': f'Failed to get load balancers: {str(e)}',
+            'message': f'Failed to get load balancers: {e!s}',
             'error': str(e)
         }
 
 
-def get_load_balancer_details(lb_name_or_id: str) -> Dict[str, Any]:
+def get_load_balancer_details(lb_name_or_id: str) -> dict[str, Any]:
     """
     Get detailed information about a specific load balancer.
     
@@ -221,12 +226,12 @@ def get_load_balancer_details(lb_name_or_id: str) -> Dict[str, Any]:
         logger.error(f"Failed to get load balancer details: {e}")
         return {
             'success': False,
-            'message': f'Failed to get load balancer details: {str(e)}',
+            'message': f'Failed to get load balancer details: {e!s}',
             'error': str(e)
         }
 
 
-def set_load_balancer(action: str, **kwargs) -> Dict[str, Any]:
+def set_load_balancer(action: str, **kwargs) -> dict[str, Any]:
     """
     Comprehensive load balancer management operations.
     
@@ -396,7 +401,7 @@ def set_load_balancer(action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to trigger failover: {str(e)}'
+                    'message': f'Failed to trigger failover: {e!s}'
                 }
         
         elif action == "stats":
@@ -429,7 +434,7 @@ def set_load_balancer(action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to get load balancer statistics: {str(e)}'
+                    'message': f'Failed to get load balancer statistics: {e!s}'
                 }
         
         elif action == "status":
@@ -464,7 +469,7 @@ def set_load_balancer(action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to get load balancer status: {str(e)}'
+                    'message': f'Failed to get load balancer status: {e!s}'
                 }
         
         else:
@@ -477,6 +482,6 @@ def set_load_balancer(action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage load balancer: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage load balancer: {str(e)}',
+            'message': f'Failed to manage load balancer: {e!s}',
             'error': str(e)
         }

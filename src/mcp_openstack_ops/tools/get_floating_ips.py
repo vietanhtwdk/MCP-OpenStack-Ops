@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_floating_ips as _get_floating_ips
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_floating_ips() -> str:
@@ -37,6 +39,6 @@ async def get_floating_ips() -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to fetch floating IPs - {str(e)}"
+        error_msg = f"Error: Failed to fetch floating IPs - {e!s}"
         logger.error(error_msg)
         return error_msg

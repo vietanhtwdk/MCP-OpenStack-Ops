@@ -1,11 +1,13 @@
 """Tool implementation for set_domains."""
 
 import json
+
 from ..functions import set_domains as _set_domains
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_domains(
@@ -31,7 +33,7 @@ async def set_domains(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -45,6 +47,6 @@ async def set_domains(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage domain: {str(e)}',
+            'message': f'Failed to manage domain: {e!s}',
             'error': str(e)
         }, indent=2)

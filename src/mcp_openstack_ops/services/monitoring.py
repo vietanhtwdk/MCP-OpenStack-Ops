@@ -6,14 +6,195 @@ getting usage statistics, quotas, and availability information.
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+import re
 from datetime import datetime, timedelta
+from typing import Any
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
+HYPERVISOR_CAPACITY_MICROVERSION = "2.87"
+HYPERVISOR_UPTIME_MICROVERSION = "2.88"
+HYPERVISOR_CAPACITY_FIELDS = (
+    "vcpus",
+    "vcpus_used",
+    "memory_mb",
+    "memory_mb_used",
+    "local_gb",
+    "local_gb_used",
+    "running_vms",
+)
 
-def get_resource_monitoring() -> Dict[str, Any]:
+
+def _first_present_attr(resource: Any, *attrs: str) -> Any:
+    """Return the first non-None OpenStack SDK resource attribute."""
+    for attr in attrs:
+        value = getattr(resource, attr, None)
+        if value is not None:
+            return value
+    return None
+
+
+def _parse_numeric(value: Any) -> int | None:
+    """Return an integer value or None when Nova did not provide the field."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_load_average(uptime: str | None) -> dict[str, float] | None:
+    """Parse Linux load averages from Nova hypervisor uptime text."""
+    if not uptime:
+        return None
+
+    match = re.search(
+        r"load averages?:\s*([0-9]+(?:\.[0-9]+)?),\s*([0-9]+(?:\.[0-9]+)?),\s*([0-9]+(?:\.[0-9]+)?)",
+        uptime,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+
+    one_minute, five_minutes, fifteen_minutes = match.groups()
+    return {
+        "1m": float(one_minute),
+        "5m": float(five_minutes),
+        "15m": float(fifteen_minutes),
+    }
+
+
+def _hypervisor_capacity_value(hypervisor: Any, field: str) -> int | None:
+    """Read per-node capacity fields across Nova and openstacksdk naming variants."""
+    field_aliases = {
+        "vcpus": ("vcpus",),
+        "vcpus_used": ("vcpus_used",),
+        "memory_mb": ("memory_mb", "memory_size", "memory_size_mb"),
+        "memory_mb_used": ("memory_mb_used", "memory_used", "memory_used_mb"),
+        "local_gb": ("local_gb", "local_disk_size", "local_disk_size_gb"),
+        "local_gb_used": ("local_gb_used", "local_disk_used", "local_disk_used_gb"),
+        "running_vms": ("running_vms",),
+    }
+    return _parse_numeric(_first_present_attr(hypervisor, *field_aliases[field]))
+
+
+def _format_hypervisor(hypervisor: Any) -> dict[str, Any]:
+    """Format one hypervisor without replacing absent capacity data with zero."""
+    uptime = getattr(hypervisor, "uptime", None)
+    capacity = {
+        field: _hypervisor_capacity_value(hypervisor, field)
+        for field in HYPERVISOR_CAPACITY_FIELDS
+    }
+
+    return {
+        "id": hypervisor.id,
+        "name": getattr(hypervisor, "name", "unknown"),
+        "host_ip": getattr(hypervisor, "host_ip", "unknown"),
+        "status": getattr(hypervisor, "status", "unknown"),
+        "state": getattr(hypervisor, "state", "unknown"),
+        **capacity,
+        "capacity_data_available": all(value is not None for value in capacity.values()),
+        "missing_capacity_fields": [
+            field for field, value in capacity.items() if value is None
+        ],
+        "uptime": uptime,
+        "load_average": _parse_load_average(uptime),
+        "hypervisor_type": getattr(hypervisor, "hypervisor_type", "unknown"),
+        "hypervisor_version": getattr(hypervisor, "hypervisor_version", "unknown"),
+    }
+
+
+def _hypervisor_identity_keys(hypervisor_data: dict[str, Any]) -> list[str]:
+    """Return stable keys that can match hypervisors across Nova microversions."""
+    keys = []
+    for key in ("id", "name"):
+        value = hypervisor_data.get(key)
+        if value not in (None, "unknown"):
+            keys.append(str(value))
+    return keys
+
+
+def _collect_hypervisor_uptime(conn: Any) -> dict[str, dict[str, Any]]:
+    """Fetch uptime fields from Nova 2.88+ without using it for capacity data."""
+    uptime_by_key = {}
+    for hypervisor in conn.compute.hypervisors(
+        details=True,
+        microversion=HYPERVISOR_UPTIME_MICROVERSION,
+    ):
+        uptime = getattr(hypervisor, "uptime", None)
+        uptime_data = {
+            "uptime": uptime,
+            "load_average": _parse_load_average(uptime),
+        }
+        identity = {
+            "id": getattr(hypervisor, "id", None),
+            "name": getattr(hypervisor, "name", None),
+        }
+        for key in _hypervisor_identity_keys(identity):
+            uptime_by_key[key] = uptime_data
+    return uptime_by_key
+
+
+def _enrich_hypervisors_with_uptime(conn: Any, hypervisors: list[dict[str, Any]]) -> None:
+    """Fill missing uptime/load fields from a microversion that still exposes them."""
+    if not any(hypervisor.get("uptime") is None for hypervisor in hypervisors):
+        return
+
+    try:
+        uptime_by_key = _collect_hypervisor_uptime(conn)
+    except Exception as e:
+        logger.warning(f"Could not retrieve hypervisor uptime data: {e}")
+        return
+
+    for hypervisor in hypervisors:
+        if hypervisor.get("uptime") is not None:
+            continue
+
+        for key in _hypervisor_identity_keys(hypervisor):
+            uptime_data = uptime_by_key.get(key)
+            if uptime_data:
+                hypervisor.update(uptime_data)
+                break
+
+
+def _new_hypervisor_totals() -> dict[str, Any]:
+    """Initialize hypervisor totals with per-field availability tracking."""
+    return {
+        "count": 0,
+        **{field: 0 for field in HYPERVISOR_CAPACITY_FIELDS},
+        "_available_counts": {field: 0 for field in HYPERVISOR_CAPACITY_FIELDS},
+    }
+
+
+def _add_hypervisor_to_totals(total_stats: dict[str, Any], hypervisor_data: dict[str, Any]) -> None:
+    """Accumulate totals only for fields Nova actually returned."""
+    total_stats["count"] += 1
+    available_counts = total_stats["_available_counts"]
+
+    for field in HYPERVISOR_CAPACITY_FIELDS:
+        value = hypervisor_data.get(field)
+        if value is not None:
+            total_stats[field] += value
+            available_counts[field] += 1
+
+
+def _finalize_hypervisor_totals(total_stats: dict[str, Any]) -> dict[str, Any]:
+    """Set unavailable aggregate fields to None instead of silent zero."""
+    available_counts = total_stats.pop("_available_counts")
+    total_stats["missing_capacity_fields"] = []
+
+    for field in HYPERVISOR_CAPACITY_FIELDS:
+        if available_counts[field] == 0:
+            total_stats[field] = None
+            total_stats["missing_capacity_fields"].append(field)
+
+    total_stats["capacity_data_available"] = not total_stats["missing_capacity_fields"]
+    return total_stats
+
+
+def get_resource_monitoring() -> dict[str, Any]:
     """
     Get comprehensive resource monitoring information for current project.
     
@@ -233,7 +414,7 @@ def get_resource_monitoring() -> Dict[str, Any]:
         }
 
 
-def get_compute_quota_usage(conn) -> Dict[str, Any]:
+def get_compute_quota_usage(conn) -> dict[str, Any]:
     """
     Get compute quota usage information.
     
@@ -288,7 +469,7 @@ def get_compute_quota_usage(conn) -> Dict[str, Any]:
         }
 
 
-def get_usage_statistics(start_date: str = "", end_date: str = "") -> Dict[str, Any]:
+def get_usage_statistics(start_date: str = "", end_date: str = "") -> dict[str, Any]:
     """
     Get usage statistics for the current project.
     
@@ -301,16 +482,20 @@ def get_usage_statistics(start_date: str = "", end_date: str = "") -> Dict[str, 
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection
+        from ..connection import get_openstack_connection, is_all_projects_allowed
         conn = get_openstack_connection()
-        
+
         # Set default dates if not provided
         if not end_date:
             end_date = datetime.now().strftime('%Y-%m-%d')
         if not start_date:
             start_datetime = datetime.now() - timedelta(days=30)
             start_date = start_datetime.strftime('%Y-%m-%d')
-        
+
+        all_projects = is_all_projects_allowed()
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - usage statistics computed across all projects")
+
         usage_stats = {
             'period': {
                 'start_date': start_date,
@@ -320,10 +505,10 @@ def get_usage_statistics(start_date: str = "", end_date: str = "") -> Dict[str, 
             'network': {},
             'storage': {}
         }
-        
+
         # Compute usage
         try:
-            servers = list(conn.compute.servers())
+            servers = list(conn.compute.servers(all_projects=all_projects))
             flavors = {f.id: f for f in conn.compute.flavors()}
             
             server_stats = {
@@ -382,8 +567,9 @@ def get_usage_statistics(start_date: str = "", end_date: str = "") -> Dict[str, 
         
         # Storage usage
         try:
-            volumes = list(conn.volume.volumes())
-            snapshots = list(conn.volume.snapshots())
+            volume_kwargs = {"all_tenants": True} if all_projects else {}
+            volumes = list(conn.volume.volumes(**volume_kwargs))
+            snapshots = list(conn.volume.snapshots(**volume_kwargs))
             
             storage_stats = {
                 'volumes': {
@@ -429,7 +615,7 @@ def get_usage_statistics(start_date: str = "", end_date: str = "") -> Dict[str, 
         }
 
 
-def get_quota(project_name: str = "") -> Dict[str, Any]:
+def get_quota(project_name: str = "") -> dict[str, Any]:
     """
     Get quota information for a project.
     
@@ -492,8 +678,10 @@ def get_quota(project_name: str = "") -> Dict[str, Any]:
                 'server_group_members': getattr(compute_quotas, 'server_group_members', -1)
             }
             
-            # Get compute usage
-            instances = list(conn.compute.servers())
+            # Get compute usage. all_projects=True is required for project_id to
+            # actually take effect - Nova silently ignores project_id otherwise
+            # and just returns the token's own project.
+            instances = list(conn.compute.servers(project_id=project_id, all_projects=True))
             active_instances = [i for i in instances if getattr(i, 'status', '') == 'ACTIVE']
             total_cores = 0
             total_ram = 0
@@ -570,15 +758,17 @@ def get_quota(project_name: str = "") -> Dict[str, Any]:
                 'backup_gigabytes': getattr(volume_quotas, 'backup_gigabytes', -1)
             }
             
-            # Get volume usage
-            volumes = list(conn.volume.volumes(project_id=project_id))
-            snapshots = list(conn.volume.snapshots(project_id=project_id))
-            
+            # Get volume usage. all_tenants=True is required for project_id to
+            # actually take effect - Cinder silently ignores project_id otherwise
+            # and just returns the token's own project.
+            volumes = list(conn.volume.volumes(project_id=project_id, all_tenants=True))
+            snapshots = list(conn.volume.snapshots(project_id=project_id, all_tenants=True))
+
             total_gigabytes = sum(getattr(vol, 'size', 0) for vol in volumes)
-            
+
             # Try to get backups (may not be available in all OpenStack deployments)
             try:
-                backups = list(conn.volume.backups(project_id=project_id))
+                backups = list(conn.volume.backups(project_id=project_id, all_tenants=True))
                 backup_gigabytes = sum(getattr(backup, 'size', 0) for backup in backups)
             except Exception:
                 backups = []
@@ -608,7 +798,7 @@ def get_quota(project_name: str = "") -> Dict[str, Any]:
         }
 
 
-def get_hypervisor_details(hypervisor_name: str = "all") -> Dict[str, Any]:
+def get_hypervisor_details(hypervisor_name: str = "all") -> dict[str, Any]:
     """
     Get details about hypervisors.
     
@@ -623,125 +813,72 @@ def get_hypervisor_details(hypervisor_name: str = "all") -> Dict[str, Any]:
         from ..connection import get_openstack_connection
         conn = get_openstack_connection()
         
-        if hypervisor_name.lower() == "all":
-            hypervisors = []
-            total_stats = {
-                'count': 0,
-                'vcpus': 0,
-                'vcpus_used': 0,
-                'memory_mb': 0,
-                'memory_mb_used': 0,
-                'local_gb': 0,
-                'local_gb_used': 0,
-                'running_vms': 0
-            }
-            
-            for hypervisor in conn.compute.hypervisors(details=True):
-                # Safely get attributes with proper None handling
-                vcpus = getattr(hypervisor, 'vcpus', None) or 0
-                vcpus_used = getattr(hypervisor, 'vcpus_used', None) or 0
-                memory_mb = getattr(hypervisor, 'memory_mb', None) or getattr(hypervisor, 'memory_size_mb', None) or 0
-                memory_mb_used = getattr(hypervisor, 'memory_mb_used', None) or getattr(hypervisor, 'memory_used_mb', None) or 0
-                local_gb = getattr(hypervisor, 'local_gb', None) or getattr(hypervisor, 'local_disk_size_gb', None) or 0
-                local_gb_used = getattr(hypervisor, 'local_gb_used', None) or getattr(hypervisor, 'local_disk_used_gb', None) or 0
-                running_vms = getattr(hypervisor, 'running_vms', None) or 0
-                
-                hyp_data = {
-                    'id': hypervisor.id,
-                    'name': getattr(hypervisor, 'name', 'unknown'),
-                    'host_ip': getattr(hypervisor, 'host_ip', 'unknown'),
-                    'status': getattr(hypervisor, 'status', 'unknown'),
-                    'state': getattr(hypervisor, 'state', 'unknown'),
-                    'vcpus': vcpus,
-                    'vcpus_used': vcpus_used,
-                    'memory_mb': memory_mb,
-                    'memory_mb_used': memory_mb_used,
-                    'local_gb': local_gb,
-                    'local_gb_used': local_gb_used,
-                    'running_vms': running_vms,
-                    'hypervisor_type': getattr(hypervisor, 'hypervisor_type', 'unknown'),
-                    'hypervisor_version': getattr(hypervisor, 'hypervisor_version', 'unknown')
-                }
-                
-                # Add to totals (now safe since all values are guaranteed integers)
-                total_stats['count'] += 1
-                total_stats['vcpus'] += vcpus
-                total_stats['vcpus_used'] += vcpus_used
-                total_stats['memory_mb'] += memory_mb
-                total_stats['memory_mb_used'] += memory_mb_used
-                total_stats['local_gb'] += local_gb
-                total_stats['local_gb_used'] += local_gb_used
-                total_stats['running_vms'] += running_vms
-                
-                hypervisors.append(hyp_data)
-            
-            # Try to get enhanced statistics from Nova API
-            enhanced_stats = None
-            try:
-                stats_response = conn.compute.get('/os-hypervisors/statistics')
-                if stats_response.status_code == 200:
-                    stats_data = stats_response.json()
-                    hypervisor_statistics = stats_data.get('hypervisor_statistics', {})
-                    
-                    if hypervisor_statistics:
-                        enhanced_stats = {
-                            'count': hypervisor_statistics.get('count', 0),
-                            'vcpus': hypervisor_statistics.get('vcpus', 0),
-                            'vcpus_used': hypervisor_statistics.get('vcpus_used', 0),
-                            'memory_mb': hypervisor_statistics.get('memory_mb', 0),
-                            'memory_mb_used': hypervisor_statistics.get('memory_mb_used', 0),
-                            'local_gb': hypervisor_statistics.get('local_gb', 0),
-                            'local_gb_used': hypervisor_statistics.get('local_gb_used', 0),
-                            'running_vms': hypervisor_statistics.get('running_vms', 0),
-                            'data_source': 'nova_hypervisor_statistics_api'
-                        }
-            except Exception as e:
-                # Continue with regular response if statistics API fails
-                pass
-            
-            return {
-                'success': True,
-                'hypervisors': hypervisors,
-                'total_stats': total_stats,
-                'enhanced_stats': enhanced_stats
-            }
-        else:
-            # Get specific hypervisor
-            for hypervisor in conn.compute.hypervisors(details=True):
-                if getattr(hypervisor, 'name', '') == hypervisor_name:
-                    # Safely get attributes with proper None handling
-                    vcpus = getattr(hypervisor, 'vcpus', None) or 0
-                    vcpus_used = getattr(hypervisor, 'vcpus_used', None) or 0
-                    memory_mb = getattr(hypervisor, 'memory_mb', None) or getattr(hypervisor, 'memory_size_mb', None) or 0
-                    memory_mb_used = getattr(hypervisor, 'memory_mb_used', None) or getattr(hypervisor, 'memory_used_mb', None) or 0
-                    local_gb = getattr(hypervisor, 'local_gb', None) or getattr(hypervisor, 'local_disk_size_gb', None) or 0
-                    local_gb_used = getattr(hypervisor, 'local_gb_used', None) or getattr(hypervisor, 'local_disk_used_gb', None) or 0
-                    running_vms = getattr(hypervisor, 'running_vms', None) or 0
-                    
-                    return {
-                        'success': True,
-                        'hypervisor': {
-                            'id': hypervisor.id,
-                            'name': getattr(hypervisor, 'name', 'unknown'),
-                            'host_ip': getattr(hypervisor, 'host_ip', 'unknown'),
-                            'status': getattr(hypervisor, 'status', 'unknown'),
-                            'state': getattr(hypervisor, 'state', 'unknown'),
-                            'vcpus': vcpus,
-                            'vcpus_used': vcpus_used,
-                            'memory_mb': memory_mb,
-                            'memory_mb_used': memory_mb_used,
-                            'local_gb': local_gb,
-                            'local_gb_used': local_gb_used,
-                            'running_vms': running_vms,
-                            'hypervisor_type': getattr(hypervisor, 'hypervisor_type', 'unknown'),
-                            'hypervisor_version': getattr(hypervisor, 'hypervisor_version', 'unknown')
-                        }
+        hypervisors = []
+        total_stats = _new_hypervisor_totals()
+
+        for hypervisor in conn.compute.hypervisors(
+            details=True,
+            microversion=HYPERVISOR_CAPACITY_MICROVERSION,
+        ):
+            hypervisor_data = _format_hypervisor(hypervisor)
+            hypervisors.append(hypervisor_data)
+            _add_hypervisor_to_totals(total_stats, hypervisor_data)
+
+        _enrich_hypervisors_with_uptime(conn, hypervisors)
+        total_stats = _finalize_hypervisor_totals(total_stats)
+
+        # Try to get enhanced cluster statistics from Nova API.
+        enhanced_stats = None
+        try:
+            stats_response = conn.compute.get(
+                '/os-hypervisors/statistics',
+                microversion=HYPERVISOR_CAPACITY_MICROVERSION,
+            )
+            if stats_response.status_code == 200:
+                stats_data = stats_response.json()
+                hypervisor_statistics = stats_data.get('hypervisor_statistics', {})
+
+                if hypervisor_statistics:
+                    enhanced_stats = {
+                        'count': hypervisor_statistics.get('count'),
+                        'vcpus': hypervisor_statistics.get('vcpus'),
+                        'vcpus_used': hypervisor_statistics.get('vcpus_used'),
+                        'memory_mb': hypervisor_statistics.get('memory_mb'),
+                        'memory_mb_used': hypervisor_statistics.get('memory_mb_used'),
+                        'local_gb': hypervisor_statistics.get('local_gb'),
+                        'local_gb_used': hypervisor_statistics.get('local_gb_used'),
+                        'running_vms': hypervisor_statistics.get('running_vms'),
+                        'data_source': 'nova_hypervisor_statistics_api',
+                        'microversion': HYPERVISOR_CAPACITY_MICROVERSION,
                     }
-            
-            return {
-                'success': False,
-                'error': f'Hypervisor "{hypervisor_name}" not found'
-            }
+        except Exception as e:
+            logger.warning(f"Could not retrieve hypervisor statistics API data: {e}")
+
+        response = {
+            'success': True,
+            'microversion': HYPERVISOR_CAPACITY_MICROVERSION,
+            'data_source': 'nova_os_hypervisors_detail',
+            'total_stats': total_stats,
+            'enhanced_stats': enhanced_stats,
+        }
+
+        if hypervisor_name.lower() == "all":
+            response['hypervisors'] = hypervisors
+            return response
+
+        for hypervisor_data in hypervisors:
+            if (
+                hypervisor_data.get('name') == hypervisor_name
+                or str(hypervisor_data.get('id')) == hypervisor_name
+            ):
+                response['hypervisor'] = hypervisor_data
+                return response
+
+        return {
+            'success': False,
+            'error': f'Hypervisor "{hypervisor_name}" not found',
+            'microversion': HYPERVISOR_CAPACITY_MICROVERSION,
+        }
             
     except Exception as e:
         logger.error(f"Failed to get hypervisor details: {e}")
@@ -752,7 +889,7 @@ def get_hypervisor_details(hypervisor_name: str = "all") -> Dict[str, Any]:
         }
 
 
-def get_availability_zones() -> Dict[str, Any]:
+def get_availability_zones() -> dict[str, Any]:
     """
     Get availability zones information.
     
@@ -819,7 +956,7 @@ def get_availability_zones() -> Dict[str, Any]:
         }
 
 
-def set_quota(project_name: str, service: str, **kwargs) -> Dict[str, Any]:
+def set_quota(project_name: str, service: str, **kwargs) -> dict[str, Any]:
     """
     Set quota for a project.
     

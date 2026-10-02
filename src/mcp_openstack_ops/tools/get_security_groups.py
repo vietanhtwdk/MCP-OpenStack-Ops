@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_security_groups as _get_security_groups
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_security_groups() -> str:
@@ -37,6 +39,6 @@ async def get_security_groups() -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to fetch security groups - {str(e)}"
+        error_msg = f"Error: Failed to fetch security groups - {e!s}"
         logger.error(error_msg)
         return error_msg

@@ -5,13 +5,13 @@ This module contains functions for managing Heat stacks and orchestration operat
 """
 
 import logging
-from typing import Dict, List, Any
+from typing import Any
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
-def get_heat_stacks() -> List[Dict[str, Any]]:
+def get_heat_stacks() -> list[dict[str, Any]]:
     """
     Get list of Heat stacks for current project.
     
@@ -20,20 +20,24 @@ def get_heat_stacks() -> List[Dict[str, Any]]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection
+        from ..connection import get_openstack_connection, is_all_projects_allowed
         conn = get_openstack_connection()
-        
+
         # Check if Heat service is available
         try:
+            all_projects = is_all_projects_allowed()
+            if all_projects:
+                logger.warning("OS_ALLOW_ALL_PROJECTS enabled - skipping per-project filtering for heat stacks")
             # Test Heat service availability
-            stacks_iterator = conn.orchestration.stacks()
+            stacks_kwargs = {"global_tenant": True} if all_projects else {}
+            stacks_iterator = conn.orchestration.stacks(**stacks_kwargs)
             current_project_id = conn.current_project_id
             stacks = []
-            
+
             for stack in stacks_iterator:
                 # Filter stacks by current project
                 stack_project_id = getattr(stack, 'project_id', None)
-                if stack_project_id == current_project_id:
+                if all_projects or stack_project_id == current_project_id:
                     stacks.append({
                         'id': stack.id,
                         'name': stack.name,
@@ -81,7 +85,7 @@ def get_heat_stacks() -> List[Dict[str, Any]]:
         ]
 
 
-def set_heat_stack(stack_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_heat_stack(stack_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage Heat stacks (create, delete, update).
     
@@ -195,6 +199,6 @@ def set_heat_stack(stack_name: str, action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage stack: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage stack: {str(e)}',
+            'message': f'Failed to manage stack: {e!s}',
             'error': str(e)
         }

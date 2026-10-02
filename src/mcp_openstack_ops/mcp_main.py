@@ -1,15 +1,18 @@
-import argparse
+import json
 import logging
 import os
 import sys
-from typing import Any, Optional, Dict, List
+from typing import Any
+
 from fastmcp import FastMCP
 from fastmcp.server.auth import StaticTokenVerifier
+
+from .config import ServerConfig, load_server_config
 
 # Add the current directory to sys.path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-def handle_operation_result(result: Dict[str, Any], operation_name: str, details: Dict[str, str] = None) -> str:
+def handle_operation_result(result: dict[str, Any], operation_name: str, details: dict[str, str] = None) -> str:
     """
     Handle operation results consistently across all MCP tools.
     
@@ -112,33 +115,30 @@ def handle_operation_result(result: Dict[str, Any], operation_name: str, details
             result["operation_type"] = "synchronous"
             result["verification_needed"] = False
     
-    # Return formatted JSON response
-    try:
-        return json.dumps(result, indent=2, ensure_ascii=False)
-    except Exception as e:
-        # Fallback for JSON serialization issues
-        return f"Operation completed but response formatting failed: {str(e)}"
-        
-        # Return formatted JSON for other successful dict results
+    if isinstance(result, dict):
         try:
             return json.dumps(result, indent=2, ensure_ascii=False)
-        except Exception as json_error:
-            return f"✅ **{operation_name} Successful**\n\nOperation completed but response formatting failed: {str(json_error)}"
-    
-    # Return string results as-is
-    return str(result) if result else "❌ **Operation Failed**: Empty response"
+        except Exception as e:
+            return f"Operation completed but response formatting failed: {e!s}"
 
-from .connection import get_openstack_connection
+    # Return string and non-dict results as-is.
+    return str(result)
+
+from .functions import (
+    get_image_detail_list as _get_image_detail_list,
+)
 from .functions import (
     get_instance_by_name as _get_instance_by_name,
-    get_network_details as _get_network_details,
-    get_volume_list as _get_volume_list,
-    get_image_detail_list as _get_image_detail_list,
+)
+from .functions import (
     get_keypair_list as _get_keypair_list,
 )
-
-import json
-from datetime import datetime
+from .functions import (
+    get_network_details as _get_network_details,
+)
+from .functions import (
+    get_volume_list as _get_volume_list,
+)
 
 # Set up logging (initial level from env; may be overridden by --log-level)
 logging.basicConfig(
@@ -150,13 +150,6 @@ logger = logging.getLogger("OpenStackService")
 # =============================================================================
 # Authentication Setup
 # =============================================================================
-
-TRUTHY_VALUES = ("true", "1", "yes", "on")
-
-
-def _parse_bool_env(value: str) -> bool:
-    return value.strip().lower() in TRUTHY_VALUES
-
 
 def _build_static_token_auth(secret_key: str) -> StaticTokenVerifier:
     tokens = {
@@ -170,7 +163,7 @@ def _build_static_token_auth(secret_key: str) -> StaticTokenVerifier:
 
 # Initialize MCP instance once for decorator registration.
 # Runtime authentication is configured in main() before mcp.run().
-logger.info("Initializing MCP instance")
+logger.debug("Initializing MCP instance")
 mcp = FastMCP("mcp-openstack-ops")
 
 # =============================================================================
@@ -218,7 +211,7 @@ def _get_resource_status_by_name(resource_type: str, resource_name: str) -> str:
             return 'Unknown Resource Type'
             
     except Exception as e:
-        return f'Status Check Failed: {str(e)}'
+        return f'Status Check Failed: {e!s}'
 
 def _is_modify_operation_allowed() -> bool:
     """Check if modify operations are allowed based on environment variable."""
@@ -282,10 +275,10 @@ def read_prompt_template(file_path: str) -> str:
         return "# OpenStack Operations Guide\n\nPrompt template file not found."
     except Exception as e:
         logger.error(f"Error reading prompt template: {e}")
-        return f"# Error\n\nFailed to read prompt template: {str(e)}"
+        return f"# Error\n\nFailed to read prompt template: {e!s}"
 
 
-def parse_prompt_sections(template: str) -> tuple[List[str], List[str]]:
+def parse_prompt_sections(template: str) -> tuple[list[str], list[str]]:
     """Parse the prompt template into sections."""
     lines = template.split('\n')
     headings = []
@@ -335,7 +328,7 @@ def prompt_template_headings_prompt() -> str:
 
 
 @mcp.prompt("prompt_template_section")
-def prompt_template_section_prompt(section: Optional[str] = None) -> str:
+def prompt_template_section_prompt(section: str | None = None) -> str:
     """Return a specific prompt template section by number or keyword."""
     if not section:
         template = read_prompt_template(PROMPT_TEMPLATE_PATH)
@@ -370,143 +363,61 @@ def prompt_template_section_prompt(section: Optional[str] = None) -> str:
 
 
 # =============================================================================
-# Configuration Validation
-# =============================================================================
-
-def validate_config(transport_type: str, host: str, port: int) -> None:
-    """Validates the configuration parameters."""
-    if transport_type not in ["stdio", "streamable-http"]:
-        raise ValueError(f"Invalid transport type: {transport_type}")
-    
-    if transport_type == "streamable-http":
-        if not host:
-            raise ValueError("Host is required for streamable-http transport")
-        if not (1 <= port <= 65535):
-            raise ValueError(f"Port must be between 1-65535, got: {port}")
-    
-    logger.info(f"Configuration validated for {transport_type} transport")
-
-
-# =============================================================================
 # Main Function
 # =============================================================================
 
-def main(argv: Optional[List[str]] = None) -> None:
-    """Main entry point for the MCP server."""
-    global mcp
-    
-    parser = argparse.ArgumentParser(
-        prog="mcp-openstack-ops", 
-        description="MCP OpenStack Operations Server",
-        formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    
-    parser.add_argument(
-        "--log-level",
-        dest="log_level",
-        help="Logging level override (DEBUG, INFO, WARNING, ERROR, CRITICAL). Overrides MCP_LOG_LEVEL env if provided.",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-    )
-    parser.add_argument(
-        "--type",
-        dest="transport_type",
-        help="Transport type (stdio or streamable-http). Default: env FASTMCP_TYPE or stdio",
-        choices=["stdio", "streamable-http"],
-        default=None,
-    )
-    parser.add_argument(
-        "--host",
-        dest="host",
-        help="Host address for streamable-http transport. Default: 127.0.0.1",
-    )
-    parser.add_argument(
-        "--port",
-        dest="port",
-        type=int,
-        help="Port number for streamable-http transport. Default: 8080",
-    )
-    auth_group = parser.add_mutually_exclusive_group()
-    auth_group.add_argument(
-        "--auth-enable",
-        dest="auth_enable",
-        action="store_true",
-        default=None,
-        help="Enable Bearer token authentication for streamable-http mode.",
-    )
-    auth_group.add_argument(
-        "--auth-disable",
-        dest="auth_enable",
-        action="store_false",
-        default=None,
-        help="Disable Bearer token authentication for streamable-http mode.",
-    )
-    parser.add_argument(
-        "--secret-key",
-        dest="secret_key",
-        help="Secret key for Bearer token authentication. Required when auth is enabled.",
-    )
-    
-    # Allow future extension without breaking unknown args usage
-    args = parser.parse_args(argv)
 
-    # Determine log level: CLI arg > environment variable > default
-    log_level = args.log_level or os.getenv("MCP_LOG_LEVEL", "INFO")
-    
-    # Set logging level
-    logging.getLogger().setLevel(log_level)
-    logger.setLevel(log_level)
-    logging.getLogger("aiohttp.client").setLevel("WARNING")  # reduce noise at DEBUG
-    
-    if args.log_level:
-        logger.info("Log level set via CLI to %s", args.log_level)
-    elif os.getenv("MCP_LOG_LEVEL"):
-        logger.info("Log level set via environment variable to %s", log_level)
-    else:
-        logger.info("Using default log level: %s", log_level)
+def _configure_logging(config: ServerConfig) -> None:
+    """Apply resolved logging configuration."""
+    logging.getLogger().setLevel(config.log_level)
+    logger.setLevel(config.log_level)
+    logging.getLogger("aiohttp.client").setLevel("WARNING")
 
-    # Priority: command line args > environment variables > defaults
-    # Transport type determination
-    transport_type = args.transport_type or os.getenv("FASTMCP_TYPE", "stdio")
-    
-    # Host determination
-    host = args.host or os.getenv("FASTMCP_HOST", "127.0.0.1")
-    
-    # Port determination (simplified)
-    port = args.port or int(os.getenv("FASTMCP_PORT", 8080))
-    
-    # Authentication setting determination
-    if args.auth_enable is None:
-        auth_enable = _parse_bool_env(os.getenv("REMOTE_AUTH_ENABLE", "false"))
+    if config.log_level_source == "cli":
+        logger.info("Log level set via CLI to %s", config.log_level)
+    elif config.log_level_source == "environment":
+        logger.info("Log level set via environment variable to %s", config.log_level)
     else:
-        auth_enable = args.auth_enable
-    secret_key = args.secret_key or os.getenv("REMOTE_SECRET_KEY", "")
-    
-    # Validation for streamable-http mode with authentication
-    if transport_type == "streamable-http":
-        if auth_enable:
-            if not secret_key:
+        logger.info("Using default log level: %s", config.log_level)
+
+
+def _configure_auth(config: ServerConfig) -> bool:
+    """Configure remote auth for the MCP server. Returns False when startup should stop."""
+    if config.transport_type == "streamable-http":
+        if config.auth_enable:
+            if not config.secret_key:
                 logger.error("ERROR: Authentication is enabled but no secret key provided.")
                 logger.error("Please set REMOTE_SECRET_KEY environment variable or use --secret-key argument.")
-                return
+                return False
             logger.info("Authentication enabled for streamable-http transport")
         else:
             logger.warning("WARNING: streamable-http mode without authentication enabled!")
             logger.warning("This server will accept requests without Bearer token verification.")
             logger.warning("Set REMOTE_AUTH_ENABLE=true and REMOTE_SECRET_KEY to enable authentication.")
 
-    # Configure authentication provider before server startup.
-    if auth_enable:
-        mcp.auth = _build_static_token_auth(secret_key)
-    else:
-        mcp.auth = None
+    mcp.auth = _build_static_token_auth(config.secret_key) if config.auth_enable else None
+    return True
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Main entry point for the MCP server."""
+    try:
+        config = load_server_config(argv)
+    except ValueError as exc:
+        logger.error("Invalid configuration: %s", exc)
+        return
+
+    _configure_logging(config)
+    if not _configure_auth(config):
+        return
 
     # Execution based on transport mode
-    if transport_type == "streamable-http":
-        logger.info(f"Starting streamable-http server on {host}:{port}")
-        mcp.run(transport="streamable-http", host=host, port=port)
+    if config.transport_type == "streamable-http":
+        logger.info("Starting streamable-http server on %s:%s", config.host, config.port)
+        mcp.run(transport="streamable-http", host=config.host, port=config.port)
     else:
         logger.info("Starting stdio transport for local usage")
-        mcp.run(transport='stdio')
+        mcp.run(transport="stdio")
 
 if __name__ == "__main__":
     """Entrypoint for MCP server.

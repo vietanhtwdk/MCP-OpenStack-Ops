@@ -1,8 +1,9 @@
 """Tool implementation for set_keypair."""
 
-import json
 from ..functions import (
     get_keypair_list as _get_keypair_list,
+)
+from ..functions import (
     set_keypair as _set_keypair,
 )
 from ..mcp_main import (
@@ -11,6 +12,7 @@ from ..mcp_main import (
     handle_operation_result,
     logger,
 )
+
 
 @conditional_tool
 async def set_keypair(
@@ -198,7 +200,7 @@ async def set_keypair(
                         
                 except Exception as e:
                     failures.append(keypair_name)
-                    results.append(f"✗ {keypair_name}: {str(e)}")
+                    results.append(f"✗ {keypair_name}: {e!s}")
             
             # Post-action status verification for all processed keypairs
             logger.info("Verifying post-action status for keypairs")
@@ -237,7 +239,7 @@ async def set_keypair(
             return "\n".join(summary_parts)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage keypair(s) - {str(e)}"
+        error_msg = f"Error: Failed to manage keypair(s) - {e!s}"
         logger.error(error_msg)
         return error_msg
         logger.error(error_msg)

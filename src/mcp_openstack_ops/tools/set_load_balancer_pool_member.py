@@ -2,10 +2,12 @@
 
 import json
 from datetime import datetime
+
 from ..mcp_main import (
     conditional_tool,
     logger,
 )
+
 
 @conditional_tool
 async def set_load_balancer_pool_member(
@@ -79,7 +81,7 @@ async def set_load_balancer_pool_member(
         return json.dumps(response, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage pool member - {str(e)}"
+        error_msg = f"Error: Failed to manage pool member - {e!s}"
         logger.error(error_msg)
         return json.dumps({
             "timestamp": datetime.now().isoformat(),

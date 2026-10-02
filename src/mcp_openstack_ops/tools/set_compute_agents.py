@@ -1,8 +1,10 @@
 """Tool implementation for set_compute_agents."""
 
 import json
+
 from ..functions import set_compute_agents as _set_compute_agents
 from ..mcp_main import conditional_tool
+
 
 @conditional_tool
 async def set_compute_agents(
@@ -32,6 +34,6 @@ async def set_compute_agents(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage compute agents: {str(e)}',
+            'message': f'Failed to manage compute agents: {e!s}',
             'error': str(e)
         }, indent=2)

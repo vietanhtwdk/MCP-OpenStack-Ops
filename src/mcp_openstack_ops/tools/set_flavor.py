@@ -1,6 +1,6 @@
 """Tool implementation for set_flavor."""
 
-from typing import Optional
+
 from ..functions import set_flavor as _set_flavor
 from ..mcp_main import (
     conditional_tool,
@@ -8,18 +8,19 @@ from ..mcp_main import (
     logger,
 )
 
+
 @conditional_tool
 async def set_flavor(
     flavor_name: str,
     action: str,
-    vcpus: Optional[int] = None,
-    ram: Optional[int] = None,
-    disk: Optional[int] = None,
-    ephemeral: Optional[int] = None,
-    swap: Optional[int] = None,
-    rxtx_factor: Optional[float] = None,
-    is_public: Optional[bool] = None,
-    properties: Optional[str] = None
+    vcpus: int | None = None,
+    ram: int | None = None,
+    disk: int | None = None,
+    ephemeral: int | None = None,
+    swap: int | None = None,
+    rxtx_factor: float | None = None,
+    is_public: bool | None = None,
+    properties: str | None = None
 ) -> str:
     """
     Manage OpenStack flavors (create, delete, set properties, list)
@@ -79,6 +80,6 @@ async def set_flavor(
         )
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage flavor - {str(e)}"
+        error_msg = f"Error: Failed to manage flavor - {e!s}"
         logger.error(error_msg)
         return error_msg

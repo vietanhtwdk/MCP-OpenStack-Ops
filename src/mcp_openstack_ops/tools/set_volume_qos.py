@@ -1,11 +1,13 @@
 """Tool implementation for set_volume_qos."""
 
 import json
+
 from ..functions import set_volume_qos as _set_volume_qos
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_volume_qos(
@@ -33,7 +35,7 @@ async def set_volume_qos(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -52,12 +54,12 @@ async def set_volume_qos(
     except json_lib.JSONDecodeError as e:
         return json.dumps({
             'success': False,
-            'message': f'Invalid JSON in specs parameter: {str(e)}',
+            'message': f'Invalid JSON in specs parameter: {e!s}',
             'error': str(e)
         }, indent=2)
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage volume QoS: {str(e)}',
+            'message': f'Failed to manage volume QoS: {e!s}',
             'error': str(e)
         }, indent=2)

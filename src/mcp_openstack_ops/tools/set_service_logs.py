@@ -1,8 +1,10 @@
 """Tool implementation for set_service_logs."""
 
 import json
+
 from ..functions import set_service_logs as _set_service_logs
 from ..mcp_main import conditional_tool
+
 
 @conditional_tool
 async def set_service_logs(
@@ -32,6 +34,6 @@ async def set_service_logs(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage service logs: {str(e)}',
+            'message': f'Failed to manage service logs: {e!s}',
             'error': str(e)
         }, indent=2)

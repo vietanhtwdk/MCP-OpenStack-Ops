@@ -1,8 +1,10 @@
 """Tool implementation for set_services."""
 
 import json
+
 from ..functions import set_services as _set_services
 from ..mcp_main import conditional_tool
+
 
 @conditional_tool
 async def set_services(
@@ -29,6 +31,6 @@ async def set_services(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage service: {str(e)}',
+            'message': f'Failed to manage service: {e!s}',
             'error': str(e)
         }, indent=2)

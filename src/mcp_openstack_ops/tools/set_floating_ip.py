@@ -7,6 +7,7 @@ from ..mcp_main import (
     logger,
 )
 
+
 @conditional_tool
 async def set_floating_ip(action: str, floating_network_id: str = "", port_id: str = "", floating_ip_id: str = "", 
                          floating_ip_address: str = "", description: str = "") -> str:
@@ -75,6 +76,6 @@ async def set_floating_ip(action: str, floating_network_id: str = "", port_id: s
         )
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage floating IP - {str(e)}"
+        error_msg = f"Error: Failed to manage floating IP - {e!s}"
         logger.error(error_msg)
         return error_msg

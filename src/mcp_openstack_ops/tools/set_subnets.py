@@ -1,11 +1,13 @@
 """Tool implementation for set_subnets."""
 
 import json
+
 from ..functions import set_subnets as _set_subnets
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_subnets(
@@ -41,7 +43,7 @@ async def set_subnets(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -64,12 +66,12 @@ async def set_subnets(
     except json_lib.JSONDecodeError as e:
         return json.dumps({
             'success': False,
-            'message': f'Invalid JSON in dns_nameservers parameter: {str(e)}',
+            'message': f'Invalid JSON in dns_nameservers parameter: {e!s}',
             'error': str(e)
         }, indent=2)
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage subnet: {str(e)}',
+            'message': f'Failed to manage subnet: {e!s}',
             'error': str(e)
         }, indent=2)

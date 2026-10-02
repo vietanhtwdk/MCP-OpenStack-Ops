@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_resource_monitoring as _get_resource_monitoring
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_resource_monitoring() -> str:
@@ -36,6 +38,6 @@ async def get_resource_monitoring() -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to monitor OpenStack resources - {str(e)}"
+        error_msg = f"Error: Failed to monitor OpenStack resources - {e!s}"
         logger.error(error_msg)
         return error_msg

@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import set_load_balancer_l7_rule as _set_load_balancer_l7_rule
 from ..mcp_main import (
     conditional_tool,
     logger,
 )
+
 
 @conditional_tool
 async def set_load_balancer_l7_rule(
@@ -62,7 +64,7 @@ async def set_load_balancer_l7_rule(
         return json.dumps(response, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage L7 rule - {str(e)}"
+        error_msg = f"Error: Failed to manage L7 rule - {e!s}"
         logger.error(error_msg)
         return json.dumps({
             "timestamp": datetime.now().isoformat(),

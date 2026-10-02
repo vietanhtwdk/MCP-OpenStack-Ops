@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_floating_ip_pools as _get_floating_ip_pools
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_floating_ip_pools() -> str:
@@ -40,6 +42,6 @@ async def get_floating_ip_pools() -> str:
         return json.dumps(result, indent=2)
         
     except Exception as e:
-        error_msg = f"Error: Failed to get floating IP pools - {str(e)}"
+        error_msg = f"Error: Failed to get floating IP pools - {e!s}"
         logger.error(error_msg)
         return error_msg

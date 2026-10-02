@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_server_volumes as _get_server_volumes
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_server_volumes(
@@ -38,6 +40,6 @@ async def get_server_volumes(
         return json.dumps(response, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to get server volumes - {str(e)}"
+        error_msg = f"Error: Failed to get server volumes - {e!s}"
         logger.error(error_msg)
         return error_msg

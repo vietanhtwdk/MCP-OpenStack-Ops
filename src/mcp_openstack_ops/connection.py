@@ -12,7 +12,8 @@ Added Project Isolation Security Features:
 
 import logging
 import os
-from typing import Optional, Any, Dict
+from typing import Any
+
 from dotenv import load_dotenv
 from openstack import connection
 
@@ -20,7 +21,19 @@ from openstack import connection
 logger = logging.getLogger(__name__)
 
 # Global connection cache
-_connection_cache: Optional[connection.Connection] = None
+_connection_cache: connection.Connection | None = None
+
+
+def is_all_projects_allowed() -> bool:
+    """
+    Check if cross-project (all_projects/all_tenants) visibility is explicitly
+    enabled via OS_ALLOW_ALL_PROJECTS. Disabled by default - this MCP server is
+    designed to be scoped to a single project (see PROJECT ISOLATION SECURITY
+    above). Enabling this requires the connected OpenStack user to hold an
+    admin-equivalent role; without it, OpenStack silently ignores all_projects
+    and scopes results back to the current project anyway.
+    """
+    return os.environ.get("OS_ALLOW_ALL_PROJECTS", "false").lower() == "true"
 
 
 def get_openstack_connection():
@@ -232,7 +245,7 @@ def validate_resource_ownership(resource: Any, resource_type: str = "resource") 
         return False
 
 
-def find_resource_by_name_or_id(resources, name_or_id: str, resource_type: str = "resource") -> Optional[Any]:
+def find_resource_by_name_or_id(resources, name_or_id: str, resource_type: str = "resource") -> Any | None:
     """
     Find a resource by name or ID, ensuring it belongs to the current project.
     

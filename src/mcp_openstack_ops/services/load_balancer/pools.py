@@ -6,13 +6,14 @@ including creating, updating, deleting, and querying pools and their members.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any
+
 from ...connection import get_openstack_connection
 
 logger = logging.getLogger(__name__)
 
 
-def get_load_balancer_pools(listener_name_or_id: str = None) -> Dict[str, Any]:
+def get_load_balancer_pools(listener_name_or_id: str = None) -> dict[str, Any]:
     """
     Get load balancer pools, optionally filtered by listener.
     
@@ -83,7 +84,7 @@ def get_load_balancer_pools(listener_name_or_id: str = None) -> Dict[str, Any]:
         logger.error(f"Failed to get pools: {e}")
         return {
             'success': False,
-            'message': f'Failed to get pools: {str(e)}',
+            'message': f'Failed to get pools: {e!s}',
             'error': str(e)
         }
 
@@ -91,7 +92,7 @@ def get_load_balancer_pools(listener_name_or_id: str = None) -> Dict[str, Any]:
 def set_load_balancer_pool(action: str, pool_name_or_id: str = "", name: str = "", 
                           listener_name_or_id: str = "", protocol: str = "", 
                           lb_algorithm: str = "ROUND_ROBIN", description: str = "", 
-                          admin_state_up: bool = True) -> Dict[str, Any]:
+                          admin_state_up: bool = True) -> dict[str, Any]:
     """
     Manage load balancer pool operations.
     
@@ -299,12 +300,12 @@ def set_load_balancer_pool(action: str, pool_name_or_id: str = "", name: str = "
         logger.error(f"Failed to manage pool: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage pool: {str(e)}',
+            'message': f'Failed to manage pool: {e!s}',
             'error': str(e)
         }
 
 
-def get_load_balancer_pool_members(pool_name_or_id: str) -> Dict[str, Any]:
+def get_load_balancer_pool_members(pool_name_or_id: str) -> dict[str, Any]:
     """
     Get members for a specific load balancer pool.
     
@@ -365,7 +366,7 @@ def get_load_balancer_pool_members(pool_name_or_id: str) -> Dict[str, Any]:
         logger.error(f"Failed to get pool members: {e}")
         return {
             'success': False,
-            'message': f'Failed to get pool members: {str(e)}',
+            'message': f'Failed to get pool members: {e!s}',
             'error': str(e)
         }
 
@@ -374,7 +375,7 @@ def set_load_balancer_pool_member(action: str, pool_name_or_id: str, member_id: 
                                  name: str = "", address: str = "", protocol_port: int = 0,
                                  weight: int = 1, admin_state_up: bool = True, 
                                  backup: bool = False, monitor_address: str = "",
-                                 monitor_port: int = 0) -> Dict[str, Any]:
+                                 monitor_port: int = 0) -> dict[str, Any]:
     """
     Manage load balancer pool member operations.
     
@@ -437,7 +438,7 @@ def set_load_balancer_pool_member(action: str, pool_name_or_id: str, member_id: 
             
             return {
                 'success': True,
-                'message': f'Pool member created successfully',
+                'message': 'Pool member created successfully',
                 'member': {
                     'id': member.id,
                     'name': getattr(member, 'name', ''),
@@ -462,7 +463,7 @@ def set_load_balancer_pool_member(action: str, pool_name_or_id: str, member_id: 
             member = None
             try:
                 member = conn.load_balancer.get_member(member_id, pool)
-            except Exception as e:
+            except Exception:
                 return {
                     'success': False,
                     'message': f'Member not found: {member_id}'
@@ -485,7 +486,7 @@ def set_load_balancer_pool_member(action: str, pool_name_or_id: str, member_id: 
             # Find member
             try:
                 member = conn.load_balancer.get_member(member_id, pool)
-            except Exception as e:
+            except Exception:
                 return {
                     'success': False,
                     'message': f'Member not found: {member_id}'
@@ -521,7 +522,7 @@ def set_load_balancer_pool_member(action: str, pool_name_or_id: str, member_id: 
             # Find member
             try:
                 member = conn.load_balancer.get_member(member_id, pool)
-            except Exception as e:
+            except Exception:
                 return {
                     'success': False,
                     'message': f'Member not found: {member_id}'
@@ -544,7 +545,7 @@ def set_load_balancer_pool_member(action: str, pool_name_or_id: str, member_id: 
             
             return {
                 'success': True,
-                'message': f'Pool member updated successfully',
+                'message': 'Pool member updated successfully',
                 'member': {
                     'id': updated_member.id,
                     'name': getattr(updated_member, 'name', ''),
@@ -567,6 +568,6 @@ def set_load_balancer_pool_member(action: str, pool_name_or_id: str, member_id: 
         logger.error(f"Failed to manage pool member: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage pool member: {str(e)}',
+            'message': f'Failed to manage pool member: {e!s}',
             'error': str(e)
         }

@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_role_assignments as _get_role_assignments
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_role_assignments() -> str:
@@ -37,6 +39,6 @@ async def get_role_assignments() -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to fetch role assignments - {str(e)}"
+        error_msg = f"Error: Failed to fetch role assignments - {e!s}"
         logger.error(error_msg)
         return error_msg

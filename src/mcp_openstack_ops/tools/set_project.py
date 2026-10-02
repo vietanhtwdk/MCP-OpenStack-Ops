@@ -7,6 +7,7 @@ from ..mcp_main import (
     logger,
 )
 
+
 @conditional_tool
 async def set_project(
     project_name: str, 
@@ -67,6 +68,6 @@ async def set_project(
         )
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage project - {str(e)}"
+        error_msg = f"Error: Failed to manage project - {e!s}"
         logger.error(error_msg)
         return error_msg

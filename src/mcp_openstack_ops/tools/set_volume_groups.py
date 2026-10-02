@@ -1,11 +1,13 @@
 """Tool implementation for set_volume_groups."""
 
 import json
+
 from ..functions import set_volume_groups as _set_volume_groups
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_volume_groups(
@@ -35,7 +37,7 @@ async def set_volume_groups(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -51,6 +53,6 @@ async def set_volume_groups(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage volume group: {str(e)}',
+            'message': f'Failed to manage volume group: {e!s}',
             'error': str(e)
         }, indent=2)

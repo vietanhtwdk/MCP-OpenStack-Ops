@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_instance_by_name as _get_instance_by_name
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_instance_by_name(instance_name: str) -> str:
@@ -36,6 +38,6 @@ async def get_instance_by_name(instance_name: str) -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to get instance '{instance_name}' - {str(e)}"
+        error_msg = f"Error: Failed to get instance '{instance_name}' - {e!s}"
         logger.error(error_msg)
         return error_msg

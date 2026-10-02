@@ -1,11 +1,13 @@
 """Tool implementation for set_identity_groups."""
 
 import json
+
 from ..functions import set_identity_groups as _set_identity_groups
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_identity_groups(
@@ -31,7 +33,7 @@ async def set_identity_groups(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -45,6 +47,6 @@ async def set_identity_groups(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage identity group: {str(e)}',
+            'message': f'Failed to manage identity group: {e!s}',
             'error': str(e)
         }, indent=2)

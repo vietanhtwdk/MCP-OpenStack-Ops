@@ -2,7 +2,8 @@
 
 import importlib
 import pkgutil
-from typing import Iterable
+from collections.abc import Iterable
+
 
 def _iter_tool_modules() -> Iterable[str]:
     """Yield importable tool module names within this package."""

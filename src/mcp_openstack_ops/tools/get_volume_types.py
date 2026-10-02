@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_volume_types as _get_volume_types
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_volume_types() -> str:
@@ -37,6 +39,6 @@ async def get_volume_types() -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to fetch volume types - {str(e)}"
+        error_msg = f"Error: Failed to fetch volume types - {e!s}"
         logger.error(error_msg)
         return error_msg

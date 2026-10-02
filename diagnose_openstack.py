@@ -3,9 +3,10 @@
 OpenStack 권한 및 API 접근 진단 스크립트
 """
 import os
+
 from dotenv import load_dotenv
 from openstack import connection
-import json
+
 
 def diagnose_openstack_access():
     load_dotenv()
@@ -31,7 +32,7 @@ def diagnose_openstack_access():
         # 1. 현재 사용자 정보
         try:
             token = conn.identity.get_token()
-            print(f"✅ 토큰 획득 성공")
+            print("✅ 토큰 획득 성공")
             
             # 사용자 역할 확인
             user_id = conn.current_user_id
@@ -92,7 +93,7 @@ def diagnose_openstack_access():
                 print(f"  Flavor RAM: {flavor.ram} MB")
                 print(f"  호스트: {getattr(server, 'OS-EXT-SRV-ATTR:host', 'N/A')}")
             
-            print(f"\n📊 프로젝트 리소스 사용량:")
+            print("\n📊 프로젝트 리소스 사용량:")
             print(f"  총 vCPUs 사용: {total_vcpus_used}")
             print(f"  총 메모리 사용: {total_memory_used} MB")
                 
@@ -107,7 +108,7 @@ def diagnose_openstack_access():
             project_id = conn.current_project_id
             quotas = conn.compute.get_quota_set(project_id)
             
-            print(f"✅ 쿼터 조회 성공:")
+            print("✅ 쿼터 조회 성공:")
             print(f"  인스턴스: {getattr(quotas, 'instances', 'N/A')}")
             print(f"  코어: {getattr(quotas, 'cores', 'N/A')}")
             print(f"  RAM: {getattr(quotas, 'ram', 'N/A')} MB")
@@ -123,7 +124,7 @@ def diagnose_openstack_access():
             project_id = conn.current_project_id
             usage = conn.compute.get_usage(project_id)
             
-            print(f"✅ 사용량 조회 성공:")
+            print("✅ 사용량 조회 성공:")
             print(f"  총 인스턴스 시간: {getattr(usage, 'total_instance_usage', 'N/A')}")
             print(f"  총 vCPU 시간: {getattr(usage, 'total_vcpus_usage', 'N/A')}")
             print(f"  총 메모리 시간: {getattr(usage, 'total_memory_mb_usage', 'N/A')}")

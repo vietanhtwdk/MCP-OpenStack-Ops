@@ -6,18 +6,18 @@ server events, and other compute-related components.
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
 def get_instance_details(
-    instance_names: Optional[List[str]] = None,
+    instance_names: list[str] | None = None,
     limit: int = 50,
     offset: int = 0,
     include_all: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get detailed information about OpenStack instances with pagination support.
     
@@ -32,33 +32,38 @@ def get_instance_details(
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection, get_current_project_id, validate_resource_ownership
+        from ..connection import (
+            get_current_project_id,
+            get_openstack_connection,
+            is_all_projects_allowed,
+            validate_resource_ownership,
+        )
         conn = get_openstack_connection()
-        
+
         # Validate and sanitize inputs
-        if limit > 200:
-            limit = 200
-        if limit < 1:
-            limit = 1
-        if offset < 0:
-            offset = 0
-        
+        limit = min(limit, 200)
+        limit = max(limit, 1)
+        offset = max(offset, 0)
+
         instances = []
-        
-        # Get all servers with project filtering enabled
-        all_servers = list(conn.compute.servers(details=True, all_projects=False))
-        
-        # Additional project validation for security
-        current_project_id = get_current_project_id()
-        validated_servers = []
-        
-        for server in all_servers:
-            if validate_resource_ownership(server, "Instance"):
-                validated_servers.append(server)
-            else:
-                logger.warning(f"Filtered out instance {getattr(server, 'id', 'unknown')} - not owned by current project")
-        
-        all_servers = validated_servers
+
+        all_projects = is_all_projects_allowed()
+        all_servers = list(conn.compute.servers(details=True, all_projects=all_projects))
+
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - skipping per-project ownership filtering for instances")
+        else:
+            # Additional project validation for security
+            current_project_id = get_current_project_id()
+            validated_servers = []
+
+            for server in all_servers:
+                if validate_resource_ownership(server, "Instance"):
+                    validated_servers.append(server)
+                else:
+                    logger.warning(f"Filtered out instance {getattr(server, 'id', 'unknown')} - not owned by current project")
+
+            all_servers = validated_servers
         
         # Filter by instance names if provided
         if instance_names:
@@ -193,7 +198,7 @@ def get_instance_details(
                     'id': server.id,
                     'name': getattr(server, 'name', 'unnamed'),
                     'status': 'error',
-                    'error': f'Failed to get details: {str(e)}'
+                    'error': f'Failed to get details: {e!s}'
                 })
         
         # Pagination metadata
@@ -230,7 +235,7 @@ def get_instance_details(
         }
 
 
-def get_instance_by_name(instance_name: str) -> Optional[Dict[str, Any]]:
+def get_instance_by_name(instance_name: str) -> dict[str, Any] | None:
     """
     Get a single instance by name.
     
@@ -249,7 +254,7 @@ def get_instance_by_name(instance_name: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def get_instance_by_id(instance_id: str) -> Optional[Dict[str, Any]]:
+def get_instance_by_id(instance_id: str) -> dict[str, Any] | None:
     """
     Get a single instance by ID.
     
@@ -270,10 +275,10 @@ def get_instance_by_id(instance_id: str) -> Optional[Dict[str, Any]]:
 
 def search_instances(
     search_term: str,
-    search_fields: Optional[List[str]] = None,
+    search_fields: list[str] | None = None,
     limit: int = 50,
     include_inactive: bool = False
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Search for instances by various fields.
     
@@ -344,7 +349,7 @@ def search_instances(
         return []
 
 
-def get_instances_by_status(status: str) -> List[Dict[str, Any]]:
+def get_instances_by_status(status: str) -> list[dict[str, Any]]:
     """
     Get instances filtered by status.
     
@@ -369,7 +374,7 @@ def get_instances_by_status(status: str) -> List[Dict[str, Any]]:
         return []
 
 
-def set_instance(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_instance(instance_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage instances (start, stop, reboot, delete, create, etc.).
     
@@ -383,7 +388,7 @@ def set_instance(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection, find_resource_by_name_or_id
+        from ..connection import find_resource_by_name_or_id, get_openstack_connection
         conn = get_openstack_connection()
         
         if action.lower() == 'list':
@@ -522,7 +527,7 @@ def set_instance(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
                 logger.error(f"Failed to create instance '{instance_name}': {create_error}")
                 return {
                     'success': False,
-                    'message': f'Instance creation failed: {str(create_error)}'
+                    'message': f'Instance creation failed: {create_error!s}'
                 }
             
         # Find existing instance for other actions using secure lookup
@@ -670,7 +675,7 @@ def set_instance(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to get console URL: {str(e)}'
+                    'message': f'Failed to get console URL: {e!s}'
                 }
                 
         elif action.lower() == 'shelve':
@@ -773,12 +778,12 @@ def set_instance(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage instance: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage instance: {str(e)}',
+            'message': f'Failed to manage instance: {e!s}',
             'error': str(e)
         }
 
 
-def get_flavor_list() -> List[Dict[str, Any]]:
+def get_flavor_list() -> list[dict[str, Any]]:
     """
     Get list of available flavors with detailed information.
     
@@ -824,7 +829,7 @@ def get_flavor_list() -> List[Dict[str, Any]]:
         ]
 
 
-def get_server_events(instance_name: str, limit: int = 50) -> Dict[str, Any]:
+def get_server_events(instance_name: str, limit: int = 50) -> dict[str, Any]:
     """
     Get server action/event history.
     
@@ -899,7 +904,7 @@ def get_server_events(instance_name: str, limit: int = 50) -> Dict[str, Any]:
             # Fallback to basic server info
             events.append({
                 'action': 'info',
-                'message': f'Server actions not available: {str(e)}',
+                'message': f'Server actions not available: {e!s}',
                 'server_id': server.id,
                 'server_name': getattr(server, 'name', 'unnamed'),
                 'server_status': getattr(server, 'status', 'unknown'),
@@ -919,13 +924,13 @@ def get_server_events(instance_name: str, limit: int = 50) -> Dict[str, Any]:
         logger.error(f"Failed to get server events: {e}")
         return {
             'success': False,
-            'message': f'Failed to get server events for "{instance_name}": {str(e)}',
+            'message': f'Failed to get server events for "{instance_name}": {e!s}',
             'events': [],
             'error': str(e)
         }
 
 
-def get_server_groups() -> List[Dict[str, Any]]:
+def get_server_groups() -> list[dict[str, Any]]:
     """
     Get list of server groups.
     
@@ -964,7 +969,7 @@ def get_server_groups() -> List[Dict[str, Any]]:
         return []
 
 
-def set_server_group(group_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_server_group(group_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage server groups (create, delete, list, show).
     
@@ -1075,12 +1080,12 @@ def set_server_group(group_name: str, action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage server group: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage server group: {str(e)}',
+            'message': f'Failed to manage server group: {e!s}',
             'error': str(e)
         }
 
 
-def set_server_network(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_server_network(instance_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage server network operations (add network, remove network, add port, remove port).
     
@@ -1257,12 +1262,12 @@ def set_server_network(instance_name: str, action: str, **kwargs) -> Dict[str, A
         logger.error(f"Failed to manage server network: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage server network: {str(e)}',
+            'message': f'Failed to manage server network: {e!s}',
             'error': str(e)
         }
 
 
-def set_server_floating_ip(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_server_floating_ip(instance_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage server floating IP operations (add, remove).
     
@@ -1397,12 +1402,12 @@ def set_server_floating_ip(instance_name: str, action: str, **kwargs) -> Dict[st
         logger.error(f"Failed to manage server floating IP: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage server floating IP: {str(e)}',
+            'message': f'Failed to manage server floating IP: {e!s}',
             'error': str(e)
         }
 
 
-def set_server_fixed_ip(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_server_fixed_ip(instance_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage server fixed IP operations (add, remove).
     
@@ -1520,12 +1525,12 @@ def set_server_fixed_ip(instance_name: str, action: str, **kwargs) -> Dict[str, 
         logger.error(f"Failed to manage server fixed IP: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage server fixed IP: {str(e)}',
+            'message': f'Failed to manage server fixed IP: {e!s}',
             'error': str(e)
         }
 
 
-def set_server_security_group(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_server_security_group(instance_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage server security group operations (add, remove).
     
@@ -1598,7 +1603,7 @@ def set_server_security_group(instance_name: str, action: str, **kwargs) -> Dict
         logger.error(f"Failed to manage server security group: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage server security group: {str(e)}',
+            'message': f'Failed to manage server security group: {e!s}',
             'error': str(e)
         }
     """
@@ -1649,7 +1654,7 @@ def set_server_security_group(instance_name: str, action: str, **kwargs) -> Dict
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to create server group: {str(e)}'
+                    'message': f'Failed to create server group: {e!s}'
                 }
                 
         elif action.lower() == 'delete':
@@ -1675,7 +1680,7 @@ def set_server_security_group(instance_name: str, action: str, **kwargs) -> Dict
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to delete server group: {str(e)}'
+                    'message': f'Failed to delete server group: {e!s}'
                 }
                 
         elif action.lower() == 'show':
@@ -1719,12 +1724,12 @@ def set_server_security_group(instance_name: str, action: str, **kwargs) -> Dict
         logger.error(f"Failed to manage server group: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage server group: {str(e)}',
+            'message': f'Failed to manage server group: {e!s}',
             'error': str(e)
         }
 
 
-def set_flavor(flavor_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_flavor(flavor_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage flavors (create, delete, set properties).
     
@@ -1805,7 +1810,7 @@ def set_flavor(flavor_name: str, action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to create flavor: {str(e)}'
+                    'message': f'Failed to create flavor: {e!s}'
                 }
                 
         elif action.lower() == 'delete':
@@ -1833,7 +1838,7 @@ def set_flavor(flavor_name: str, action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to delete flavor: {str(e)}'
+                    'message': f'Failed to delete flavor: {e!s}'
                 }
                 
         elif action.lower() == 'set_extra_specs':
@@ -1867,7 +1872,7 @@ def set_flavor(flavor_name: str, action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to set extra specs: {str(e)}'
+                    'message': f'Failed to set extra specs: {e!s}'
                 }
                 
         else:
@@ -1880,12 +1885,12 @@ def set_flavor(flavor_name: str, action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage flavor: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage flavor: {str(e)}',
+            'message': f'Failed to manage flavor: {e!s}',
             'error': str(e)
         }
 
 
-def set_server_migration(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_server_migration(instance_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage server migration operations (migrate, evacuate, confirm, revert, etc.).
     
@@ -2035,7 +2040,7 @@ def set_server_migration(instance_name: str, action: str, **kwargs) -> Dict[str,
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Migration "{migration_id}" not found: {str(e)}'
+                    'message': f'Migration "{migration_id}" not found: {e!s}'
                 }
                 
         elif action.lower() == 'abort':
@@ -2055,7 +2060,7 @@ def set_server_migration(instance_name: str, action: str, **kwargs) -> Dict[str,
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to abort migration "{migration_id}": {str(e)}'
+                    'message': f'Failed to abort migration "{migration_id}": {e!s}'
                 }
                 
         elif action.lower() == 'force_complete':
@@ -2075,7 +2080,7 @@ def set_server_migration(instance_name: str, action: str, **kwargs) -> Dict[str,
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to force complete migration "{migration_id}": {str(e)}'
+                    'message': f'Failed to force complete migration "{migration_id}": {e!s}'
                 }
         else:
             return {
@@ -2087,12 +2092,12 @@ def set_server_migration(instance_name: str, action: str, **kwargs) -> Dict[str,
         logger.error(f"Failed to manage server migration: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage server migration: {str(e)}',
+            'message': f'Failed to manage server migration: {e!s}',
             'error': str(e)
         }
 
 
-def set_server_properties(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_server_properties(instance_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage server properties and metadata (set, unset).
     
@@ -2211,12 +2216,12 @@ def set_server_properties(instance_name: str, action: str, **kwargs) -> Dict[str
         logger.error(f"Failed to manage server properties: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage server properties: {str(e)}',
+            'message': f'Failed to manage server properties: {e!s}',
             'error': str(e)
         }
 
 
-def create_server_backup(instance_name: str, backup_name: str, **kwargs) -> Dict[str, Any]:
+def create_server_backup(instance_name: str, backup_name: str, **kwargs) -> dict[str, Any]:
     """
     Create a backup image of a server.
     
@@ -2277,12 +2282,12 @@ def create_server_backup(instance_name: str, backup_name: str, **kwargs) -> Dict
         logger.error(f"Failed to create server backup: {e}")
         return {
             'success': False,
-            'message': f'Failed to create server backup: {str(e)}',
+            'message': f'Failed to create server backup: {e!s}',
             'error': str(e)
         }
 
 
-def create_server_dump(instance_name: str, **kwargs) -> Dict[str, Any]:
+def create_server_dump(instance_name: str, **kwargs) -> dict[str, Any]:
     """
     Create a dump file for a server (if supported by the compute driver).
     
@@ -2323,6 +2328,6 @@ def create_server_dump(instance_name: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to create server dump: {e}")
         return {
             'success': False,
-            'message': f'Failed to create server dump: {str(e)}',
+            'message': f'Failed to create server dump: {e!s}',
             'error': str(e)
         }

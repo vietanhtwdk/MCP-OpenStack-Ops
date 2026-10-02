@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_service_status as _get_service_status
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_service_status() -> str:
@@ -46,6 +48,6 @@ async def get_service_status() -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to fetch OpenStack service status - {str(e)}"
+        error_msg = f"Error: Failed to fetch OpenStack service status - {e!s}"
         logger.error(error_msg)
         return error_msg

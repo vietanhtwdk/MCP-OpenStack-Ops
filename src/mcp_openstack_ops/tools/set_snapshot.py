@@ -1,8 +1,9 @@
 """Tool implementation for set_snapshot."""
 
-import json
 from ..functions import (
     get_volume_snapshots as _get_volume_snapshots,
+)
+from ..functions import (
     set_snapshot as _set_snapshot,
 )
 from ..mcp_main import (
@@ -11,6 +12,7 @@ from ..mcp_main import (
     handle_operation_result,
     logger,
 )
+
 
 @conditional_tool
 async def set_snapshot(
@@ -211,7 +213,7 @@ async def set_snapshot(
                         
                 except Exception as e:
                     failures.append(snapshot_name)
-                    results.append(f"✗ {snapshot_name}: {str(e)}")
+                    results.append(f"✗ {snapshot_name}: {e!s}")
             
             # Post-action status verification for all processed snapshots
             logger.info("Verifying post-action status for snapshots")
@@ -250,6 +252,6 @@ async def set_snapshot(
             return "\n".join(summary_parts)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage snapshot(s) - {str(e)}"
+        error_msg = f"Error: Failed to manage snapshot(s) - {e!s}"
         logger.error(error_msg)
         return error_msg

@@ -4,11 +4,12 @@ OpenStack Core Connection and Cluster Management Functions
 This module contains core functions for OpenStack connection management and cluster-wide operations.
 """
 
-import os
 import logging
-from typing import Dict, List, Any, Optional
+import os
 from datetime import datetime
-from ..connection import get_openstack_connection, reset_connection_cache
+from typing import Any
+
+from ..connection import get_openstack_connection
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 # get_cluster_status function removed - use combination of get_* tools for comprehensive cluster reports
 
 
-def get_service_status(service_name: str = "") -> Dict[str, Any]:
+def get_service_status(service_name: str = "") -> dict[str, Any]:
     """
     Get comprehensive OpenStack cluster status including all services and resources.
     
@@ -93,8 +94,9 @@ def get_service_status(service_name: str = "") -> Dict[str, Any]:
                 elif service == 'orchestration':
                     # Test orchestration service (Heat) with manual API call
                     try:
-                        import requests
                         import os
+
+                        import requests
                         
                         # Get project ID and token
                         project_id = conn.current_project_id
@@ -148,7 +150,7 @@ def get_service_status(service_name: str = "") -> Dict[str, Any]:
                         logger.warning(f"Heat service check failed: {e}")
                         service_status['available'] = False
                         service_status['endpoint'] = 'unavailable'
-                        service_status['error'] = f'Heat API error: {str(e)}'
+                        service_status['error'] = f'Heat API error: {e!s}'
                 
                 status_data['services'][service] = service_status
                 
@@ -158,7 +160,7 @@ def get_service_status(service_name: str = "") -> Dict[str, Any]:
                     'error': str(e),
                     'last_check': datetime.now().isoformat()
                 }
-                status_data['health']['issues'].append(f'{service.title()} service: {str(e)}')
+                status_data['health']['issues'].append(f'{service.title()} service: {e!s}')
         
         # Get resource counts
         try:
@@ -623,7 +625,7 @@ def get_service_status(service_name: str = "") -> Dict[str, Any]:
                 }
             
         except Exception as e:
-            status_data['health']['issues'].append(f'Resource count error: {str(e)}')
+            status_data['health']['issues'].append(f'Resource count error: {e!s}')
         
         # Get quotas (enhanced with usage data)
         try:
@@ -679,10 +681,8 @@ def get_service_status(service_name: str = "") -> Dict[str, Any]:
                 hv_vcpus_used = status_data['resources']['hypervisors']['vcpus_used']
                 hv_ram_used = status_data['resources']['hypervisors']['memory_mb_used']
                 # Use hypervisor data if it seems reasonable
-                if hv_vcpus_used >= current_vcpus_used:
-                    current_vcpus_used = hv_vcpus_used
-                if hv_ram_used >= current_ram_used:
-                    current_ram_used = hv_ram_used
+                current_vcpus_used = max(hv_vcpus_used, current_vcpus_used)
+                current_ram_used = max(hv_ram_used, current_ram_used)
             
             # Calculate current network ports usage
             current_ports_used = len(ports) if 'ports' in locals() else status_data['resources']['network'].get('ports', 0)
@@ -748,7 +748,7 @@ def get_service_status(service_name: str = "") -> Dict[str, Any]:
                 }
             }
         except Exception as e:
-            status_data['health']['issues'].append(f'Quota retrieval error: {str(e)}')
+            status_data['health']['issues'].append(f'Quota retrieval error: {e!s}')
         
         # Determine overall health (enhanced)
         available_services = sum(1 for s in status_data['services'].values() if s.get('available', False))
@@ -942,13 +942,13 @@ def get_service_status(service_name: str = "") -> Dict[str, Any]:
             'quotas': {},
             'health': {
                 'overall': 'error',
-                'issues': [f'Cluster status check failed: {str(e)}']
+                'issues': [f'Cluster status check failed: {e!s}']
             },
             'error': str(e)
         }
 
 
-def get_service_status(service_name: str = "") -> Dict[str, Any]:
+def get_service_status(service_name: str = "") -> dict[str, Any]:
     """
     Get detailed status for specific OpenStack services.
     
@@ -1145,8 +1145,9 @@ def get_service_status(service_name: str = "") -> Dict[str, Any]:
             elif service_name == 'orchestration':
                 # Detailed orchestration service check with direct API call
                 try:
-                    import requests
                     import os
+
+                    import requests
                     
                     # Get project ID and token
                     project_id = conn.current_project_id

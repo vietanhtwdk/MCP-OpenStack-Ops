@@ -6,13 +6,13 @@ security groups, floating IPs, and other networking components.
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
-def get_network_details(network_name: str = "all") -> List[Dict[str, Any]]:
+def get_network_details(network_name: str = "all") -> list[dict[str, Any]]:
     """
     Get detailed information about networks in current project.
     
@@ -24,20 +24,29 @@ def get_network_details(network_name: str = "all") -> List[Dict[str, Any]]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection, get_current_project_id, validate_resource_ownership
+        from ..connection import (
+            get_current_project_id,
+            get_openstack_connection,
+            is_all_projects_allowed,
+            validate_resource_ownership,
+        )
         conn = get_openstack_connection()
         current_project_id = get_current_project_id()
-        
+
         networks = []
-        
+        all_projects = is_all_projects_allowed()
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - skipping per-project ownership filtering for networks")
+
         if network_name.lower() == "all":
             for network in conn.network.networks():
                 # Get project ID first
                 network_project = getattr(network, 'project_id', None) or getattr(network, 'tenant_id', None)
-                
+
                 # Enhanced project validation with utility functions
-                if (validate_resource_ownership(network, "Network") or 
-                    getattr(network, 'is_shared', False) or 
+                if (all_projects or
+                    validate_resource_ownership(network, "Network") or
+                    getattr(network, 'is_shared', False) or
                     getattr(network, 'is_router_external', False)):  # Include shared and external networks
                     
                     # Get subnets for this network with project validation
@@ -45,7 +54,7 @@ def get_network_details(network_name: str = "all") -> List[Dict[str, Any]]:
                     for subnet in conn.network.subnets():
                         if getattr(subnet, 'network_id', None) == network.id:
                             # Enhanced validation using utility functions
-                            if validate_resource_ownership(subnet, "Subnet"):
+                            if all_projects or validate_resource_ownership(subnet, "Subnet"):
                                 subnets.append({
                                     'id': subnet.id,
                                     'name': getattr(subnet, 'name', 'unnamed'),
@@ -79,16 +88,17 @@ def get_network_details(network_name: str = "all") -> List[Dict[str, Any]]:
                 if getattr(network, 'name', '') == network_name or network.id == network_name:
                     # Check if network is accessible by current project
                     network_project = getattr(network, 'project_id', None) or getattr(network, 'tenant_id', None)
-                    if (network_project == current_project_id or 
-                        getattr(network, 'is_shared', False) or 
+                    if (all_projects or
+                        network_project == current_project_id or
+                        getattr(network, 'is_shared', False) or
                         getattr(network, 'is_router_external', False)):
-                        
+
                         # Get subnets for this network
                         subnets = []
                         for subnet in conn.network.subnets():
                             if getattr(subnet, 'network_id', None) == network.id:
                                 subnet_project = getattr(subnet, 'project_id', None) or getattr(subnet, 'tenant_id', None)
-                                if subnet_project == current_project_id:
+                                if all_projects or subnet_project == current_project_id:
                                     subnets.append({
                                         'id': subnet.id,
                                         'name': getattr(subnet, 'name', 'unnamed'),
@@ -133,7 +143,7 @@ def get_network_details(network_name: str = "all") -> List[Dict[str, Any]]:
         ]
 
 
-def set_networks(action: str, network_name: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def set_networks(action: str, network_name: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage networks (create, delete, update, list).
     
@@ -199,7 +209,10 @@ def set_networks(action: str, network_name: Optional[str] = None, **kwargs) -> D
                 }
             
             # Find the network using secure project-scoped lookup
-            from ..connection import find_resource_by_name_or_id, get_openstack_connection
+            from ..connection import (
+                find_resource_by_name_or_id,
+                get_openstack_connection,
+            )
             conn = get_openstack_connection()
             
             network = find_resource_by_name_or_id(
@@ -283,11 +296,11 @@ def set_networks(action: str, network_name: Optional[str] = None, **kwargs) -> D
         logger.error(f"Network management failed: {e}")
         return {
             'success': False,
-            'message': f'Network management failed: {str(e)}'
+            'message': f'Network management failed: {e!s}'
         }
 
 
-def get_security_groups() -> List[Dict[str, Any]]:
+def get_security_groups() -> list[dict[str, Any]]:
     """
     Get list of security groups with rules for current project.
     
@@ -296,15 +309,19 @@ def get_security_groups() -> List[Dict[str, Any]]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection
+        from ..connection import get_openstack_connection, is_all_projects_allowed
         conn = get_openstack_connection()
         current_project_id = conn.current_project_id
         security_groups = []
-        
+
+        all_projects = is_all_projects_allowed()
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - skipping per-project filtering for security groups")
+
         for sg in conn.network.security_groups():
             # Filter by current project
             sg_project_id = getattr(sg, 'project_id', None) or getattr(sg, 'tenant_id', None)
-            if sg_project_id == current_project_id:
+            if all_projects or sg_project_id == current_project_id:
                 rules = []
                 for rule in getattr(sg, 'security_group_rules', []):
                     rules.append({
@@ -343,7 +360,7 @@ def get_security_groups() -> List[Dict[str, Any]]:
         ]
 
 
-def get_floating_ips() -> List[Dict[str, Any]]:
+def get_floating_ips() -> list[dict[str, Any]]:
     """
     Get list of floating IPs for current project.
     
@@ -352,15 +369,19 @@ def get_floating_ips() -> List[Dict[str, Any]]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection
+        from ..connection import get_openstack_connection, is_all_projects_allowed
         conn = get_openstack_connection()
         current_project_id = conn.current_project_id
         floating_ips = []
-        
+
+        all_projects = is_all_projects_allowed()
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - skipping per-project filtering for floating IPs")
+
         for fip in conn.network.ips():
             # Filter by current project
             fip_project_id = getattr(fip, 'project_id', None) or getattr(fip, 'tenant_id', None)
-            if fip_project_id == current_project_id:
+            if all_projects or fip_project_id == current_project_id:
                 floating_ips.append({
                     'id': fip.id,
                     'floating_ip_address': getattr(fip, 'floating_ip_address', 'unknown'),
@@ -388,7 +409,7 @@ def get_floating_ips() -> List[Dict[str, Any]]:
         ]
 
 
-def set_floating_ip(action: str, **kwargs) -> Dict[str, Any]:
+def set_floating_ip(action: str, **kwargs) -> dict[str, Any]:
     """
     Manage floating IPs (allocate, release, associate, disassociate).
     
@@ -455,7 +476,7 @@ def set_floating_ip(action: str, **kwargs) -> Dict[str, Any]:
             
             return {
                 'success': True,
-                'message': f'Floating IP allocated successfully',
+                'message': 'Floating IP allocated successfully',
                 'floating_ip': {
                     'id': fip.id,
                     'floating_ip_address': getattr(fip, 'floating_ip_address', 'unknown'),
@@ -733,12 +754,12 @@ def set_floating_ip(action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage floating IP: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage floating IP: {str(e)}',
+            'message': f'Failed to manage floating IP: {e!s}',
             'error': str(e)
         }
 
 
-def get_floating_ip_pools() -> List[Dict[str, Any]]:
+def get_floating_ip_pools() -> list[dict[str, Any]]:
     """
     Get list of floating IP pools (external networks).
     
@@ -790,7 +811,7 @@ def get_floating_ip_pools() -> List[Dict[str, Any]]:
         }]
 
 
-def set_floating_ip_port_forwarding(action: str, **kwargs) -> Dict[str, Any]:
+def set_floating_ip_port_forwarding(action: str, **kwargs) -> dict[str, Any]:
     """
     Manage floating IP port forwarding rules.
     
@@ -908,7 +929,7 @@ def set_floating_ip_port_forwarding(action: str, **kwargs) -> Dict[str, Any]:
                 pf = conn.network.create_port_forwarding(floatingip=fip.id, **create_params)
                 return {
                     'success': True,
-                    'message': f'Port forwarding rule created successfully',
+                    'message': 'Port forwarding rule created successfully',
                     'port_forwarding': {
                         'id': pf.id,
                         'protocol': getattr(pf, 'protocol', protocol),
@@ -920,7 +941,7 @@ def set_floating_ip_port_forwarding(action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to create port forwarding rule: {str(e)}',
+                    'message': f'Failed to create port forwarding rule: {e!s}',
                     'note': 'Port forwarding may not be supported in this OpenStack deployment'
                 }
                 
@@ -938,12 +959,12 @@ def set_floating_ip_port_forwarding(action: str, **kwargs) -> Dict[str, Any]:
                 conn.network.delete_port_forwarding(port_forwarding_id, floatingip=floating_ip_id)
                 return {
                     'success': True,
-                    'message': f'Port forwarding rule deleted successfully'
+                    'message': 'Port forwarding rule deleted successfully'
                 }
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to delete port forwarding rule: {str(e)}'
+                    'message': f'Failed to delete port forwarding rule: {e!s}'
                 }
                 
         elif action.lower() == 'show':
@@ -975,7 +996,7 @@ def set_floating_ip_port_forwarding(action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to get port forwarding rule: {str(e)}'
+                    'message': f'Failed to get port forwarding rule: {e!s}'
                 }
                 
         elif action.lower() == 'set':
@@ -1012,7 +1033,7 @@ def set_floating_ip_port_forwarding(action: str, **kwargs) -> Dict[str, Any]:
                 )
                 return {
                     'success': True,
-                    'message': f'Port forwarding rule updated successfully',
+                    'message': 'Port forwarding rule updated successfully',
                     'port_forwarding': {
                         'id': pf.id,
                         'protocol': getattr(pf, 'protocol', 'unknown'),
@@ -1024,7 +1045,7 @@ def set_floating_ip_port_forwarding(action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to update port forwarding rule: {str(e)}'
+                    'message': f'Failed to update port forwarding rule: {e!s}'
                 }
         
         else:
@@ -1037,11 +1058,11 @@ def set_floating_ip_port_forwarding(action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Port forwarding management failed: {e}")
         return {
             'success': False,
-            'message': f'Port forwarding management failed: {str(e)}'
+            'message': f'Port forwarding management failed: {e!s}'
         }
 
 
-def get_routers() -> List[Dict[str, Any]]:
+def get_routers() -> list[dict[str, Any]]:
     """
     Get list of routers with detailed information for current project.
     
@@ -1050,15 +1071,19 @@ def get_routers() -> List[Dict[str, Any]]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection
+        from ..connection import get_openstack_connection, is_all_projects_allowed
         conn = get_openstack_connection()
         current_project_id = conn.current_project_id
         routers = []
-        
+
+        all_projects = is_all_projects_allowed()
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - skipping per-project filtering for routers")
+
         for router in conn.network.routers():
             # Filter by current project
             router_project_id = getattr(router, 'project_id', None) or getattr(router, 'tenant_id', None)
-            if router_project_id == current_project_id:
+            if all_projects or router_project_id == current_project_id:
                 # Get router interfaces (ports)
                 interfaces = []
                 try:
@@ -1102,7 +1127,7 @@ def get_routers() -> List[Dict[str, Any]]:
         ]
 
 
-def set_network_ports(action: str, port_name: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def set_network_ports(action: str, port_name: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage network ports.
     
@@ -1247,12 +1272,12 @@ def set_network_ports(action: str, port_name: Optional[str] = None, **kwargs) ->
         logger.error(f"Failed to manage network port: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage network port: {str(e)}',
+            'message': f'Failed to manage network port: {e!s}',
             'error': str(e)
         }
 
 
-def set_subnets(action: str, subnet_name: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def set_subnets(action: str, subnet_name: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage network subnets.
     
@@ -1408,6 +1433,6 @@ def set_subnets(action: str, subnet_name: Optional[str] = None, **kwargs) -> Dic
         logger.error(f"Failed to manage subnet: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage subnet: {str(e)}',
+            'message': f'Failed to manage subnet: {e!s}',
             'error': str(e)
         }

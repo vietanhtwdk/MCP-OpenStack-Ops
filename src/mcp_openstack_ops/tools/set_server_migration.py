@@ -2,12 +2,14 @@
 
 import json
 from datetime import datetime
+
 from ..functions import set_server_migration as _set_server_migration
 from ..mcp_main import (
     conditional_tool,
     handle_operation_result,
     logger,
 )
+
 
 @conditional_tool
 async def set_server_migration(
@@ -76,7 +78,7 @@ async def set_server_migration(
         )
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage server migration - {str(e)}"
+        error_msg = f"Error: Failed to manage server migration - {e!s}"
         logger.error(error_msg)
         return json.dumps({
             "timestamp": datetime.now().isoformat(),

@@ -1,27 +1,141 @@
-import os
 import logging
-from typing import Dict, List, Any, Optional
-from openstack import connection
-from dotenv import load_dotenv
 from datetime import datetime
+from typing import Any
 
 # Import connection management from separate module
-from .connection import get_openstack_connection, reset_connection_cache
+from .connection import get_openstack_connection
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Public API of this module: functions defined below plus every name re-exported
+# from services.*. Required so linters' unused-import checks (e.g. ruff F401)
+# don't flag/auto-delete these re-export blocks as dead code.
+__all__ = [
+    # Defined in this file
+    "get_service_status",
+    "set_identity_groups",
+    "set_roles",
+    "set_services",
+    "set_service_logs",
+    "set_metrics",
+    "set_alarms",
+    "set_compute_agents",
+    "set_network_qos_policies",
+    "set_network_agents",
+
+    # Re-exported from services.compute
+    "get_instance_details",
+    "get_instance_by_name",
+    "get_instance_by_id",
+    "search_instances",
+    "get_instances_by_status",
+    "set_instance",
+    "get_flavor_list",
+    "get_server_events",
+    "get_server_groups",
+    "set_server_group",
+    "set_flavor",
+    "set_server_network",
+    "set_server_floating_ip",
+    "set_server_fixed_ip",
+    "set_server_security_group",
+    "set_server_migration",
+    "set_server_properties",
+    "create_server_backup",
+    "create_server_dump",
+
+    # Re-exported from services.network
+    "get_network_details",
+    "get_security_groups",
+    "get_floating_ips",
+    "get_floating_ip_pools",
+    "set_floating_ip",
+    "set_floating_ip_port_forwarding",
+    "get_routers",
+    "set_networks",
+    "set_network_ports",
+    "set_subnets",
+
+    # Re-exported from services.storage
+    "get_volume_list",
+    "set_volume",
+    "get_volume_types",
+    "get_volume_snapshots",
+    "set_snapshot",
+    "set_volume_backups",
+    "set_volume_groups",
+    "set_volume_qos",
+    "get_server_volumes",
+    "set_server_volume",
+
+    # Re-exported from services.identity
+    "get_project_info",
+    "get_user_list",
+    "get_role_assignments",
+    "get_keypair_list",
+    "set_keypair",
+    "get_project_details",
+    "set_project",
+    "set_domains",
+
+    # Re-exported from services.image
+    "get_image_list",
+    "get_image_detail_list",
+    "set_image",
+    "set_image_members",
+    "set_image_metadata",
+    "set_image_visibility",
+
+    # Re-exported from services.monitoring
+    "get_resource_monitoring",
+    "get_compute_quota_usage",
+    "get_usage_statistics",
+    "get_quota",
+    "get_hypervisor_details",
+    "get_availability_zones",
+    "set_quota",
+
+    # Re-exported from services.orchestration
+    "get_heat_stacks",
+    "set_heat_stack",
+
+    # Re-exported from services.load_balancer
+    "get_load_balancer_list",
+    "get_load_balancer_details",
+    "set_load_balancer",
+    "get_load_balancer_listeners",
+    "set_load_balancer_listener",
+    "get_load_balancer_pools",
+    "set_load_balancer_pool",
+    "get_load_balancer_pool_members",
+    "set_load_balancer_pool_member",
+    "get_load_balancer_health_monitors",
+    "set_load_balancer_health_monitor",
+    "get_load_balancer_l7_policies",
+    "set_load_balancer_l7_policy",
+    "get_load_balancer_l7_rules",
+    "set_load_balancer_l7_rule",
+    "get_load_balancer_availability_zones",
+    "set_load_balancer_availability_zone",
+    "get_load_balancer_flavors",
+    "set_load_balancer_flavor",
+    "get_load_balancer_providers",
+    "get_load_balancer_quotas",
+    "set_load_balancer_quota",
+    "get_load_balancer_amphorae",
+    "set_load_balancer_amphora",
+    "_set_load_balancer_amphora",
+]
+
 # Import core functions from services
-from .services.core import (
-    get_service_status
-)
+from .services.core import get_service_status
 
 # Import connection utilities
-from .connection import reset_connection_cache
 
 
-def get_service_status() -> List[Dict[str, Any]]:
+def get_service_status() -> list[dict[str, Any]]:
     """
     Returns detailed service status information for compute and network services.
     
@@ -103,7 +217,7 @@ def get_service_status() -> List[Dict[str, Any]]:
                 'state': 'down',
                 'zone': 'internal',
                 'updated_at': 'unknown',
-                'disabled_reason': f'Service check failed: {str(e)}',
+                'disabled_reason': f'Service check failed: {e!s}',
                 'service_type': 'image'
             })
             
@@ -130,7 +244,7 @@ def get_service_status() -> List[Dict[str, Any]]:
                 'state': 'down',
                 'zone': 'internal',
                 'updated_at': 'unknown',
-                'disabled_reason': f'Service check failed: {str(e)}',
+                'disabled_reason': f'Service check failed: {e!s}',
                 'service_type': 'orchestration'
             })
             
@@ -159,7 +273,7 @@ def get_service_status() -> List[Dict[str, Any]]:
 # Image Service (Glance) Functions - Enhanced
 # =============================================================================
 
-def set_identity_groups(action: str, group_name: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def set_identity_groups(action: str, group_name: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage OpenStack identity groups (list, show, create, delete, update)
     
@@ -189,7 +303,7 @@ def set_identity_groups(action: str, group_name: Optional[str] = None, **kwargs)
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Identity groups not accessible: {str(e)}',
+                    'message': f'Identity groups not accessible: {e!s}',
                     'groups': []
                 }
             return {
@@ -223,7 +337,7 @@ def set_identity_groups(action: str, group_name: Optional[str] = None, **kwargs)
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to create group: {str(e)}'
+                    'message': f'Failed to create group: {e!s}'
                 }
         
         else:
@@ -236,12 +350,12 @@ def set_identity_groups(action: str, group_name: Optional[str] = None, **kwargs)
         logger.error(f"Failed to manage identity group: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage identity group: {str(e)}',
+            'message': f'Failed to manage identity group: {e!s}',
             'error': str(e)
         }
 
 
-def set_roles(action: str, role_name: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def set_roles(action: str, role_name: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage OpenStack roles (list, show, create, delete, assign, unassign)
     
@@ -271,7 +385,7 @@ def set_roles(action: str, role_name: Optional[str] = None, **kwargs) -> Dict[st
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Roles not accessible: {str(e)}',
+                    'message': f'Roles not accessible: {e!s}',
                     'roles': []
                 }
             return {
@@ -305,7 +419,7 @@ def set_roles(action: str, role_name: Optional[str] = None, **kwargs) -> Dict[st
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to create role: {str(e)}'
+                    'message': f'Failed to create role: {e!s}'
                 }
         
         else:
@@ -318,12 +432,12 @@ def set_roles(action: str, role_name: Optional[str] = None, **kwargs) -> Dict[st
         logger.error(f"Failed to manage role: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage role: {str(e)}',
+            'message': f'Failed to manage role: {e!s}',
             'error': str(e)
         }
 
 
-def set_services(action: str, service_name: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def set_services(action: str, service_name: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage OpenStack services (list, show, create, delete)
     
@@ -354,7 +468,7 @@ def set_services(action: str, service_name: Optional[str] = None, **kwargs) -> D
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Services not accessible: {str(e)}',
+                    'message': f'Services not accessible: {e!s}',
                     'services': []
                 }
             return {
@@ -373,7 +487,7 @@ def set_services(action: str, service_name: Optional[str] = None, **kwargs) -> D
         logger.error(f"Failed to manage service: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage service: {str(e)}',
+            'message': f'Failed to manage service: {e!s}',
             'error': str(e)
         }
 
@@ -382,7 +496,7 @@ def set_service_logs(
     action: str,
     service_name: str = None,
     log_level: str = "INFO"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage OpenStack service logs and logging configuration.
     
@@ -462,7 +576,7 @@ def set_service_logs(
         logger.error(f"Failed to manage service logs: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage service logs: {str(e)}',
+            'message': f'Failed to manage service logs: {e!s}',
             'error': str(e)
         }
 
@@ -471,7 +585,7 @@ def set_metrics(
     action: str,
     resource_type: str = "compute",
     resource_id: str = None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage OpenStack metrics collection and monitoring.
     
@@ -593,7 +707,7 @@ def set_metrics(
                 summary['storage']['in_use'] = len([v for v in volumes if v.status == 'in-use'])
                 
             except Exception as e:
-                summary['error'] = f"Could not get complete summary: {str(e)}"
+                summary['error'] = f"Could not get complete summary: {e!s}"
                 
             return {
                 'success': True,
@@ -610,7 +724,7 @@ def set_metrics(
         logger.error(f"Failed to manage metrics: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage metrics: {str(e)}',
+            'message': f'Failed to manage metrics: {e!s}',
             'error': str(e)
         }
 
@@ -621,7 +735,7 @@ def set_alarms(
     resource_id: str = None,
     threshold: float = None,
     comparison: str = "gt"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage OpenStack alarms and alerting (requires Aodh service).
     
@@ -737,7 +851,7 @@ def set_alarms(
         logger.error(f"Failed to manage alarms: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage alarms: {str(e)}',
+            'message': f'Failed to manage alarms: {e!s}',
             'error': str(e)
         }
 
@@ -746,7 +860,7 @@ def set_compute_agents(
     action: str,
     agent_id: str = None,
     host: str = None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Manage OpenStack compute agents and hypervisor monitoring.
     
@@ -846,7 +960,7 @@ def set_compute_agents(
                 except Exception as e:
                     return {
                         'success': False,
-                        'message': f'Agent not found: {str(e)}'
+                        'message': f'Agent not found: {e!s}'
                     }
             else:
                 # Search by host
@@ -879,7 +993,7 @@ def set_compute_agents(
         logger.error(f"Failed to manage compute agents: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage compute agents: {str(e)}',
+            'message': f'Failed to manage compute agents: {e!s}',
             'error': str(e)
         }
 
@@ -888,7 +1002,7 @@ def set_compute_agents(
         logger.error(f"Failed to manage compute agents: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage compute agents: {str(e)}',
+            'message': f'Failed to manage compute agents: {e!s}',
             'error': str(e)
         }
 
@@ -900,141 +1014,130 @@ def set_compute_agents(
 # Load balancer functions are now modularized in services.load_balancer
 # Import compute functions from services
 from .services.compute import (
-    get_instance_details,
-    get_instance_by_name,
-    get_instance_by_id,
-    search_instances,
-    get_instances_by_status,
-    set_instance,
+    create_server_backup,
+    create_server_dump,
     get_flavor_list,
+    get_instance_by_id,
+    get_instance_by_name,
+    get_instance_details,
+    get_instances_by_status,
     get_server_events,
     get_server_groups,
-    set_server_group,
+    search_instances,
     set_flavor,
-    set_server_network,
-    set_server_floating_ip,
+    set_instance,
     set_server_fixed_ip,
-    set_server_security_group,
+    set_server_floating_ip,
+    set_server_group,
     set_server_migration,
+    set_server_network,
     set_server_properties,
-    create_server_backup,
-    create_server_dump
-)
-
-# Import network functions from services
-from .services.network import (
-    get_network_details,
-    get_security_groups,
-    get_floating_ips,
-    get_floating_ip_pools,
-    set_floating_ip,
-    set_floating_ip_port_forwarding,
-    get_routers,
-    set_networks,
-    set_network_ports,
-    set_subnets
-)
-
-# Import storage functions from services
-from .services.storage import (
-    get_volume_list,
-    set_volume,
-    get_volume_types,
-    get_volume_snapshots,
-    set_snapshot,
-    set_volume_backups,
-    set_volume_groups,
-    set_volume_qos,
-    get_server_volumes,
-    set_server_volume
+    set_server_security_group,
 )
 
 # Import identity functions from services
 from .services.identity import (
-    get_project_info,
-    get_user_list,
-    get_role_assignments,
     get_keypair_list,
-    set_keypair,
     get_project_details,
+    get_project_info,
+    get_role_assignments,
+    get_user_list,
+    set_domains,
+    set_keypair,
     set_project,
-    set_domains
 )
 
 # Import image functions from services
 from .services.image import (
-    get_image_list,
     get_image_detail_list,
+    get_image_list,
     set_image,
     set_image_members,
     set_image_metadata,
-    set_image_visibility
+    set_image_visibility,
+)
+from .services.load_balancer import (
+    _set_load_balancer_amphora,
+    # Amphora operations
+    get_load_balancer_amphorae,
+    # Management operations
+    get_load_balancer_availability_zones,
+    get_load_balancer_details,
+    get_load_balancer_flavors,
+    # Health monitor operations
+    get_load_balancer_health_monitors,
+    # L7 policy operations
+    get_load_balancer_l7_policies,
+    get_load_balancer_l7_rules,
+    # Core operations
+    get_load_balancer_list,
+    # Listener operations
+    get_load_balancer_listeners,
+    get_load_balancer_pool_members,
+    # Pool operations
+    get_load_balancer_pools,
+    get_load_balancer_providers,
+    get_load_balancer_quotas,
+    set_load_balancer,
+    set_load_balancer_amphora,
+    set_load_balancer_availability_zone,
+    set_load_balancer_flavor,
+    set_load_balancer_health_monitor,
+    set_load_balancer_l7_policy,
+    set_load_balancer_l7_rule,
+    set_load_balancer_listener,
+    set_load_balancer_pool,
+    set_load_balancer_pool_member,
+    set_load_balancer_quota,
 )
 
 # Import monitoring functions from services  
 from .services.monitoring import (
-    get_resource_monitoring,
-    get_compute_quota_usage,
-    get_usage_statistics,
-    get_quota,
-    get_hypervisor_details,
     get_availability_zones,
-    set_quota
+    get_compute_quota_usage,
+    get_hypervisor_details,
+    get_quota,
+    get_resource_monitoring,
+    get_usage_statistics,
+    set_quota,
+)
+
+# Import network functions from services
+from .services.network import (
+    get_floating_ip_pools,
+    get_floating_ips,
+    get_network_details,
+    get_routers,
+    get_security_groups,
+    set_floating_ip,
+    set_floating_ip_port_forwarding,
+    set_network_ports,
+    set_networks,
+    set_subnets,
 )
 
 # Import orchestration functions from services
-from .services.orchestration import (
-    get_heat_stacks,
-    set_heat_stack
-)
+from .services.orchestration import get_heat_stacks, set_heat_stack
 
-from .services.load_balancer import (
-    # Core operations
-    get_load_balancer_list,
-    get_load_balancer_details, 
-    set_load_balancer,
-    
-    # Listener operations
-    get_load_balancer_listeners,
-    set_load_balancer_listener,
-    
-    # Pool operations
-    get_load_balancer_pools,
-    set_load_balancer_pool,
-    get_load_balancer_pool_members,
-    set_load_balancer_pool_member,
-    
-    # Health monitor operations
-    get_load_balancer_health_monitors,
-    set_load_balancer_health_monitor,
-    
-    # L7 policy operations
-    get_load_balancer_l7_policies,
-    set_load_balancer_l7_policy,
-    get_load_balancer_l7_rules,
-    set_load_balancer_l7_rule,
-    
-    # Management operations
-    get_load_balancer_availability_zones,
-    set_load_balancer_availability_zone,
-    get_load_balancer_flavors,
-    set_load_balancer_flavor,
-    get_load_balancer_providers,
-    get_load_balancer_quotas,
-    set_load_balancer_quota,
-    
-    # Amphora operations
-    get_load_balancer_amphorae,
-    set_load_balancer_amphora,
-    _set_load_balancer_amphora
+# Import storage functions from services
+from .services.storage import (
+    get_server_volumes,
+    get_volume_list,
+    get_volume_snapshots,
+    get_volume_types,
+    set_server_volume,
+    set_snapshot,
+    set_volume,
+    set_volume_backups,
+    set_volume_groups,
+    set_volume_qos,
 )
-
 
 # =============================================================================
 # ADDITIONAL UTILITY FUNCTIONS (TEMPORARY IMPLEMENTATIONS)
 # =============================================================================
 
-def set_network_qos_policies(action: str, policy_name: str = None, **kwargs) -> Dict[str, Any]:
+def set_network_qos_policies(action: str, policy_name: str = None, **kwargs) -> dict[str, Any]:
     """
     Temporary implementation for network QoS policies management
     TODO: Implement full functionality in network.py
@@ -1046,7 +1149,7 @@ def set_network_qos_policies(action: str, policy_name: str = None, **kwargs) -> 
         "policy_name": policy_name
     }
 
-def set_network_agents(action: str, agent_id: str = None, **kwargs) -> Dict[str, Any]:
+def set_network_agents(action: str, agent_id: str = None, **kwargs) -> dict[str, Any]:
     """
     Temporary implementation for network agents management
     TODO: Implement full functionality in network.py

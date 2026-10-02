@@ -2,11 +2,15 @@
 
 import json
 from datetime import datetime
-from ..functions import set_floating_ip_port_forwarding as _set_floating_ip_port_forwarding
+
+from ..functions import (
+    set_floating_ip_port_forwarding as _set_floating_ip_port_forwarding,
+)
 from ..mcp_main import (
     conditional_tool,
     logger,
 )
+
 
 @conditional_tool
 async def set_floating_ip_port_forwarding(
@@ -85,6 +89,6 @@ async def set_floating_ip_port_forwarding(
         return json.dumps(result, indent=2)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage floating IP port forwarding - {str(e)}"
+        error_msg = f"Error: Failed to manage floating IP port forwarding - {e!s}"
         logger.error(error_msg)
         return error_msg

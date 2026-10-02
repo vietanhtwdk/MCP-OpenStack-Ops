@@ -1,11 +1,13 @@
 """Tool implementation for set_image_visibility."""
 
 import json
+
 from ..functions import set_image_visibility as _set_image_visibility
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_image_visibility(
@@ -29,7 +31,7 @@ async def set_image_visibility(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -42,6 +44,6 @@ async def set_image_visibility(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage image visibility: {str(e)}',
+            'message': f'Failed to manage image visibility: {e!s}',
             'error': str(e)
         }, indent=2)

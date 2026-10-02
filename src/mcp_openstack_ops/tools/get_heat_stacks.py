@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_heat_stacks as _get_heat_stacks
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_heat_stacks() -> str:
@@ -37,6 +39,6 @@ async def get_heat_stacks() -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to fetch Heat stacks - {str(e)}"
+        error_msg = f"Error: Failed to fetch Heat stacks - {e!s}"
         logger.error(error_msg)
         return error_msg

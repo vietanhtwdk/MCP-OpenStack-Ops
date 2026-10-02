@@ -6,47 +6,21 @@ Each module focuses on a specific OpenStack service area for better maintainabil
 """
 
 # Core connection and cluster management
-from .core import (
-    get_service_status
-)
-
 # Compute service functions
 from .compute import (
-    get_instance_details,
-    get_instance_by_name,
-    get_instance_by_id,
-    search_instances,
-    get_instances_by_status,
-    set_instance,
     get_flavor_list,
-    set_flavor,
+    get_instance_by_id,
+    get_instance_by_name,
+    get_instance_details,
+    get_instances_by_status,
     get_server_events,
     get_server_groups,
-    set_server_group
+    search_instances,
+    set_flavor,
+    set_instance,
+    set_server_group,
 )
-
-# Storage service functions
-from .storage import (
-    set_volume,
-    get_volume_list,
-    get_volume_types,
-    get_volume_snapshots,
-    set_snapshot,
-    set_volume_backups,
-    set_volume_groups,
-    set_volume_qos
-)
-
-# Network service functions
-from .network import (
-    get_network_details,
-    get_security_groups,
-    get_floating_ips,
-    set_floating_ip,
-    get_routers,
-    set_network_ports,
-    set_subnets
-)
+from .core import get_service_status
 
 # Load balancer service functions - TODO: Create load_balancer module
 # from .load_balancer import (
@@ -81,57 +55,65 @@ from .network import (
 #     get_load_balancer_quotas,
 #     set_load_balancer_quota
 # )
-
 # Identity service functions
 from .identity import (
-    get_project_info,
-    get_project_details,
-    set_project,
-    get_user_list,
-    get_role_assignments,
     get_keypair_list,
-    set_keypair
-)
-
-# Orchestration service functions
-from .orchestration import (
-    get_heat_stacks,
-    set_heat_stack
+    get_project_details,
+    get_project_info,
+    get_role_assignments,
+    get_user_list,
+    set_keypair,
+    set_project,
 )
 
 # Image service functions
 from .image import (
-    get_image_list,
     get_image_detail_list,
+    get_image_list,
     set_image,
     set_image_members,
     set_image_metadata,
-    set_image_visibility
+    set_image_visibility,
 )
 
 # Monitoring and resource management
 from .monitoring import (
-    get_resource_monitoring,
-    get_usage_statistics,
-    get_quota,
-    set_quota,
+    get_availability_zones,
     get_compute_quota_usage,
     get_hypervisor_details,
-    get_availability_zones
+    get_quota,
+    get_resource_monitoring,
+    get_usage_statistics,
+    set_quota,
 )
 
+# Network service functions
+from .network import (
+    get_floating_ips,
+    get_network_details,
+    get_routers,
+    get_security_groups,
+    set_floating_ip,
+    set_network_ports,
+    set_subnets,
+)
+
+# Orchestration service functions
+from .orchestration import get_heat_stacks, set_heat_stack
+
+# Storage service functions
 # Storage service functions  
 from .storage import (
+    get_server_volumes,
     get_volume_list,
-    set_volume,
-    get_volume_types,
     get_volume_snapshots,
+    get_volume_types,
+    set_server_volume,
     set_snapshot,
+    set_volume,
     set_volume_backups,
     set_volume_groups,
     set_volume_qos,
-    get_server_volumes,
-    set_server_volume
 )
 
 __all__ = [

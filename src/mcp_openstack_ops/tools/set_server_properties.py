@@ -2,12 +2,14 @@
 
 import json
 from datetime import datetime
+
 from ..functions import set_server_properties as _set_server_properties
 from ..mcp_main import (
     conditional_tool,
     handle_operation_result,
     logger,
 )
+
 
 @conditional_tool
 async def set_server_properties(
@@ -70,7 +72,7 @@ async def set_server_properties(
         )
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage server properties - {str(e)}"
+        error_msg = f"Error: Failed to manage server properties - {e!s}"
         logger.error(error_msg)
         return json.dumps({
             "timestamp": datetime.now().isoformat(),

@@ -1,8 +1,10 @@
 """Tool implementation for set_metrics."""
 
 import json
+
 from ..functions import set_metrics as _set_metrics
 from ..mcp_main import conditional_tool
+
 
 @conditional_tool
 async def set_metrics(
@@ -32,6 +34,6 @@ async def set_metrics(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage metrics: {str(e)}',
+            'message': f'Failed to manage metrics: {e!s}',
             'error': str(e)
         }, indent=2)

@@ -1,11 +1,13 @@
 """Tool implementation for set_roles."""
 
 import json
+
 from ..functions import set_roles as _set_roles
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_roles(
@@ -31,7 +33,7 @@ async def set_roles(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -45,6 +47,6 @@ async def set_roles(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage role: {str(e)}',
+            'message': f'Failed to manage role: {e!s}',
             'error': str(e)
         }, indent=2)

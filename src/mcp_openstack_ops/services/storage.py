@@ -6,13 +6,13 @@ volume types, and other storage-related components.
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
-def get_volume_list() -> List[Dict[str, Any]]:
+def get_volume_list() -> list[dict[str, Any]]:
     """
     Get list of volumes with detailed information for current project.
     
@@ -21,14 +21,24 @@ def get_volume_list() -> List[Dict[str, Any]]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection, get_current_project_id, validate_resource_ownership
+        from ..connection import (
+            get_current_project_id,
+            get_openstack_connection,
+            is_all_projects_allowed,
+            validate_resource_ownership,
+        )
         conn = get_openstack_connection()
         current_project_id = get_current_project_id()
         volumes = []
-        
-        for volume in conn.volume.volumes():
-            # Enhanced project validation using utility functions
-            if validate_resource_ownership(volume, "Volume"):
+
+        all_projects = is_all_projects_allowed()
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - skipping per-project ownership filtering for volumes")
+
+        volume_kwargs = {"all_tenants": True} if all_projects else {}
+        for volume in conn.volume.volumes(**volume_kwargs):
+            # Enhanced project validation using utility functions (skipped in all_projects mode)
+            if all_projects or validate_resource_ownership(volume, "Volume"):
                 # Get attachment information
                 attachments = []
                 for attachment in getattr(volume, 'attachments', []):
@@ -73,7 +83,7 @@ def get_volume_list() -> List[Dict[str, Any]]:
         ]
 
 
-def set_volume(volume_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_volume(volume_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage volumes (create, delete, extend, attach, detach, snapshot).
     
@@ -146,7 +156,10 @@ def set_volume(volume_name: str, action: str, **kwargs) -> Dict[str, Any]:
             
         elif action.lower() == 'delete':
             # Find the volume using secure project-scoped lookup
-            from ..connection import find_resource_by_name_or_id, get_openstack_connection
+            from ..connection import (
+                find_resource_by_name_or_id,
+                get_openstack_connection,
+            )
             conn = get_openstack_connection()
             
             volume = find_resource_by_name_or_id(
@@ -326,12 +339,12 @@ def set_volume(volume_name: str, action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage volume: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage volume: {str(e)}',
+            'message': f'Failed to manage volume: {e!s}',
             'error': str(e)
         }
 
 
-def get_volume_types() -> List[Dict[str, Any]]:
+def get_volume_types() -> list[dict[str, Any]]:
     """
     Get list of volume types.
     
@@ -366,7 +379,7 @@ def get_volume_types() -> List[Dict[str, Any]]:
         ]
 
 
-def get_volume_snapshots() -> List[Dict[str, Any]]:
+def get_volume_snapshots() -> list[dict[str, Any]]:
     """
     Get list of volume snapshots for current project.
     
@@ -375,15 +388,20 @@ def get_volume_snapshots() -> List[Dict[str, Any]]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection
+        from ..connection import get_openstack_connection, is_all_projects_allowed
         conn = get_openstack_connection()
         current_project_id = conn.current_project_id
         snapshots = []
-        
-        for snapshot in conn.volume.snapshots():
+
+        all_projects = is_all_projects_allowed()
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - skipping per-project filtering for volume snapshots")
+
+        snapshot_kwargs = {"all_tenants": True} if all_projects else {}
+        for snapshot in conn.volume.snapshots(**snapshot_kwargs):
             # Filter by current project
             snapshot_project_id = getattr(snapshot, 'project_id', None)
-            if snapshot_project_id == current_project_id:
+            if all_projects or snapshot_project_id == current_project_id:
                 snapshots.append({
                     'id': snapshot.id,
                     'name': getattr(snapshot, 'name', 'unnamed'),
@@ -409,7 +427,7 @@ def get_volume_snapshots() -> List[Dict[str, Any]]:
         ]
 
 
-def set_snapshot(snapshot_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_snapshot(snapshot_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage volume snapshots (create, delete, restore).
     
@@ -544,12 +562,12 @@ def set_snapshot(snapshot_name: str, action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage snapshot: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage snapshot: {str(e)}',
+            'message': f'Failed to manage snapshot: {e!s}',
             'error': str(e)
         }
 
 
-def set_volume_backups(action: str, backup_name: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def set_volume_backups(action: str, backup_name: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage volume backups.
     
@@ -629,7 +647,7 @@ def set_volume_backups(action: str, backup_name: Optional[str] = None, **kwargs)
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to create backup: {str(e)}'
+                    'message': f'Failed to create backup: {e!s}'
                 }
                 
         else:
@@ -642,12 +660,12 @@ def set_volume_backups(action: str, backup_name: Optional[str] = None, **kwargs)
         logger.error(f"Failed to manage backup: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage backup: {str(e)}',
+            'message': f'Failed to manage backup: {e!s}',
             'error': str(e)
         }
 
 
-def set_volume_groups(action: str, group_name: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def set_volume_groups(action: str, group_name: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage volume groups (consistency groups).
     
@@ -701,12 +719,12 @@ def set_volume_groups(action: str, group_name: Optional[str] = None, **kwargs) -
         logger.error(f"Failed to manage volume group: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage volume group: {str(e)}',
+            'message': f'Failed to manage volume group: {e!s}',
             'error': str(e)
         }
 
 
-def set_volume_qos(action: str, qos_name: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def set_volume_qos(action: str, qos_name: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage volume QoS policies.
     
@@ -758,29 +776,31 @@ def set_volume_qos(action: str, qos_name: Optional[str] = None, **kwargs) -> Dic
         logger.error(f"Failed to manage QoS policy: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage QoS policy: {str(e)}',
+            'message': f'Failed to manage QoS policy: {e!s}',
             'error': str(e)
         }
 
 
-def get_server_volumes(instance_name: str) -> List[Dict[str, Any]]:
+def get_server_volumes(instance_name: str) -> list[dict[str, Any]]:
     """
     Get volumes attached to a specific server/instance.
-    
+
     Args:
         instance_name: Name or ID of the server
-        
+
     Returns:
         List of attached volumes
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection
+        from ..connection import get_openstack_connection, is_all_projects_allowed
         conn = get_openstack_connection()
-        
-        # Find the server first
+
+        # Find the server first (search across all projects if enabled, since the
+        # server may live outside the token's own project)
+        all_projects = is_all_projects_allowed()
         server = None
-        for srv in conn.compute.servers():
+        for srv in conn.compute.servers(all_projects=all_projects):
             if getattr(srv, 'name', '') == instance_name or srv.id == instance_name:
                 server = srv
                 break
@@ -850,7 +870,7 @@ def get_server_volumes(instance_name: str) -> List[Dict[str, Any]]:
         return [{'error': str(e), 'instance_name': instance_name}]
 
 
-def set_server_volume(instance_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_server_volume(instance_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage server volume attachments (attach, detach, list).
     
@@ -947,7 +967,7 @@ def set_server_volume(instance_name: str, action: str, **kwargs) -> Dict[str, An
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to attach volume: {str(e)}'
+                    'message': f'Failed to attach volume: {e!s}'
                 }
                 
         elif action.lower() == 'detach':
@@ -996,7 +1016,7 @@ def set_server_volume(instance_name: str, action: str, **kwargs) -> Dict[str, An
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to detach volume: {str(e)}'
+                    'message': f'Failed to detach volume: {e!s}'
                 }
                 
         else:
@@ -1009,6 +1029,6 @@ def set_server_volume(instance_name: str, action: str, **kwargs) -> Dict[str, An
         logger.error(f"Failed to manage server volume: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage server volume: {str(e)}',
+            'message': f'Failed to manage server volume: {e!s}',
             'error': str(e)
         }

@@ -1,10 +1,12 @@
 """Tool implementation for set_instance."""
 
-import json
-from typing import Optional
 from ..functions import (
     get_instance_by_name as _get_instance_by_name,
+)
+from ..functions import (
     get_instances_by_status as _get_instances_by_status,
+)
+from ..functions import (
     set_instance as _set_instance,
 )
 from ..mcp_main import (
@@ -13,6 +15,7 @@ from ..mcp_main import (
     logger,
 )
 from ..services.compute import search_instances as _search_instances
+
 
 @conditional_tool
 async def set_instance(
@@ -24,12 +27,12 @@ async def set_instance(
     flavor_contains: str = "",
     image_contains: str = "",
     # Instance creation/modification parameters
-    flavor: Optional[str] = None,
-    image: Optional[str] = None,
-    networks: Optional[str] = None,
-    security_groups: Optional[str] = None,
-    key_name: Optional[str] = None,
-    availability_zone: Optional[str] = None
+    flavor: str | None = None,
+    image: str | None = None,
+    networks: str | None = None,
+    security_groups: str | None = None,
+    key_name: str | None = None,
+    availability_zone: str | None = None
 ) -> str:
     """
     Manages OpenStack instances with operations like start, stop, restart, pause, unpause, and create.
@@ -217,7 +220,7 @@ async def set_instance(
                 else:
                     post_status = 'Not Found'
             except Exception as e:
-                post_status = f'Status Check Failed: {str(e)}'
+                post_status = f'Status Check Failed: {e!s}'
             
             # Use centralized result handling with enhanced status info
             base_result = handle_operation_result(
@@ -270,7 +273,7 @@ async def set_instance(
                         
                 except Exception as e:
                     failures.append(instance_name)
-                    results.append(f"✗ {instance_name}: {str(e)}")
+                    results.append(f"✗ {instance_name}: {e!s}")
             
             # Post-action status verification for all processed instances
             logger.info("Verifying post-action status for instances")
@@ -290,7 +293,7 @@ async def set_instance(
                     else:
                         post_action_status[instance_name] = 'Not Found'
                 except Exception as e:
-                    post_action_status[instance_name] = f'Status Check Failed: {str(e)}'
+                    post_action_status[instance_name] = f'Status Check Failed: {e!s}'
             
             # Prepare summary with post-action status
             summary_parts = [
@@ -318,6 +321,6 @@ async def set_instance(
             return "\n".join(summary_parts)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage instance(s) '{instance_names}' - {str(e)}"
+        error_msg = f"Error: Failed to manage instance(s) '{instance_names}' - {e!s}"
         logger.error(error_msg)
         return error_msg

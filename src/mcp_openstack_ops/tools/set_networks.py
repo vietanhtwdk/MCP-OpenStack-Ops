@@ -1,9 +1,11 @@
 """Tool implementation for set_networks."""
 
-import json
 from datetime import datetime
+
 from ..functions import (
     get_network_details as _get_network_details,
+)
+from ..functions import (
     set_networks as _set_networks,
 )
 from ..mcp_main import (
@@ -12,6 +14,7 @@ from ..mcp_main import (
     handle_operation_result,
     logger,
 )
+
 
 @conditional_tool
 async def set_networks(
@@ -96,16 +99,7 @@ async def set_networks(
         # For list action, handle separately
         if action == 'list':
             logger.info("Listing all networks")
-            result = _set_networks(action, "", **{
-                'description': description,
-                'admin_state_up': admin_state_up,
-                'shared': shared,
-                'external': external,
-                'provider_network_type': provider_network_type,
-                'provider_physical_network': provider_physical_network,
-                'provider_segmentation_id': provider_segmentation_id,
-                'mtu': mtu
-            })
+            result = _set_networks(action, "", description=description, admin_state_up=admin_state_up, shared=shared, external=external, provider_network_type=provider_network_type, provider_physical_network=provider_physical_network, provider_segmentation_id=provider_segmentation_id, mtu=mtu)
             return handle_operation_result(result, "Network Management", {"Action": action})
         
         # Determine targeting method
@@ -247,7 +241,7 @@ async def set_networks(
                         
                 except Exception as e:
                     failures.append(network_name)
-                    results.append(f"✗ {network_name}: {str(e)}")
+                    results.append(f"✗ {network_name}: {e!s}")
             
             # Post-action status verification for all processed networks
             logger.info("Verifying post-action status for networks")
@@ -286,7 +280,7 @@ async def set_networks(
             return "\n".join(summary_parts)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage network(s) - {str(e)}"
+        error_msg = f"Error: Failed to manage network(s) - {e!s}"
         logger.error(error_msg)
         return error_msg
     """
@@ -358,6 +352,6 @@ async def set_networks(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage network: {str(e)}',
+            'message': f'Failed to manage network: {e!s}',
             'error': str(e)
         }, indent=2)

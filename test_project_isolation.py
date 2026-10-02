@@ -15,8 +15,7 @@ Requirements:
 
 import os
 import sys
-import json
-from typing import Dict, Any
+
 from dotenv import load_dotenv
 
 # Add source to Python path
@@ -42,12 +41,15 @@ def test_project_isolation():
     # Test connection and project ID verification
     print("\n1️⃣ Testing Connection and Project ID...")
     try:
-        from mcp_openstack_ops.connection import get_openstack_connection, get_current_project_id
+        from mcp_openstack_ops.connection import (
+            get_current_project_id,
+            get_openstack_connection,
+        )
         
         conn = get_openstack_connection()
         current_project_id = get_current_project_id()
         
-        print(f"✅ Connection successful")
+        print("✅ Connection successful")
         print(f"✅ Current project ID: {current_project_id}")
         
         # Verify project name matches project ID
@@ -55,7 +57,7 @@ def test_project_isolation():
         if project and project.id == current_project_id:
             print(f"✅ Project name '{project_name}' matches project ID")
         else:
-            print(f"⚠️  WARNING: Project name/ID mismatch detected")
+            print("⚠️  WARNING: Project name/ID mismatch detected")
             
     except Exception as e:
         print(f"❌ Connection test failed: {e}")
@@ -64,7 +66,10 @@ def test_project_isolation():
     # Test resource ownership validation
     print("\n2️⃣ Testing Resource Ownership Validation...")
     try:
-        from mcp_openstack_ops.connection import validate_resource_ownership, find_resource_by_name_or_id
+        from mcp_openstack_ops.connection import (
+            find_resource_by_name_or_id,
+            validate_resource_ownership,
+        )
         
         # Test with compute instances
         servers = list(conn.compute.servers())

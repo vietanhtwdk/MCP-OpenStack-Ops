@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import set_load_balancer_quota as _set_load_balancer_quota
 from ..mcp_main import (
     conditional_tool,
     logger,
 )
+
 
 @conditional_tool
 async def set_load_balancer_quota(
@@ -59,7 +61,7 @@ async def set_load_balancer_quota(
         return json.dumps(response, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage quota - {str(e)}"
+        error_msg = f"Error: Failed to manage quota - {e!s}"
         logger.error(error_msg)
         return json.dumps({
             "timestamp": datetime.now().isoformat(),

@@ -5,13 +5,13 @@ This module contains functions for managing images, image metadata, and image sh
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
-def get_image_list() -> List[Dict[str, Any]]:
+def get_image_list() -> list[dict[str, Any]]:
     """
     Get list of images accessible by current project.
     
@@ -46,9 +46,7 @@ def get_image_list() -> List[Dict[str, Any]]:
             elif visibility == 'shared':
                 # For shared images, we include them all since checking member list is complex
                 include_image = True
-            elif visibility == 'private' and owner == current_project_id:
-                include_image = True
-            elif owner == current_project_id:  # Catch-all for project-owned images
+            elif visibility == 'private' and owner == current_project_id or owner == current_project_id:
                 include_image = True
                 
             if include_image:
@@ -78,7 +76,7 @@ def get_image_list() -> List[Dict[str, Any]]:
         ]
 
 
-def get_image_detail_list() -> List[Dict[str, Any]]:
+def get_image_detail_list() -> list[dict[str, Any]]:
     """
     Get detailed list of images accessible by current project.
     
@@ -109,9 +107,7 @@ def get_image_detail_list() -> List[Dict[str, Any]]:
             elif visibility == 'shared':
                 # For shared images, we include them all since checking member list is complex
                 include_image = True
-            elif visibility == 'private' and owner == current_project_id:
-                include_image = True
-            elif owner == current_project_id:  # Catch-all for project-owned images
+            elif visibility == 'private' and owner == current_project_id or owner == current_project_id:
                 include_image = True
                 
             if include_image:
@@ -141,7 +137,7 @@ def get_image_detail_list() -> List[Dict[str, Any]]:
         return []
 
 
-def set_image(image_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_image(image_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage images (create, delete, update, list).
     
@@ -210,7 +206,10 @@ def set_image(image_name: str, action: str, **kwargs) -> Dict[str, Any]:
             
         elif action.lower() == 'delete':
             # Find the image using secure project-scoped lookup
-            from ..connection import find_resource_by_name_or_id, get_openstack_connection
+            from ..connection import (
+                find_resource_by_name_or_id,
+                get_openstack_connection,
+            )
             conn = get_openstack_connection()
             
             image = find_resource_by_name_or_id(
@@ -272,12 +271,12 @@ def set_image(image_name: str, action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage image: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage image: {str(e)}',
+            'message': f'Failed to manage image: {e!s}',
             'error': str(e)
         }
 
 
-def set_image_members(action: str, image_name: str, member_project: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def set_image_members(action: str, image_name: str, member_project: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage OpenStack image members (sharing images between projects)
     
@@ -322,7 +321,7 @@ def set_image_members(action: str, image_name: str, member_project: Optional[str
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to list image members: {str(e)}',
+                    'message': f'Failed to list image members: {e!s}',
                     'members': []
                 }
             return {
@@ -352,7 +351,7 @@ def set_image_members(action: str, image_name: str, member_project: Optional[str
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to add image member: {str(e)}'
+                    'message': f'Failed to add image member: {e!s}'
                 }
                 
         elif action.lower() == 'remove':
@@ -373,7 +372,7 @@ def set_image_members(action: str, image_name: str, member_project: Optional[str
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to remove image member: {str(e)}'
+                    'message': f'Failed to remove image member: {e!s}'
                 }
         
         else:
@@ -386,12 +385,12 @@ def set_image_members(action: str, image_name: str, member_project: Optional[str
         logger.error(f"Failed to manage image members: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage image members: {str(e)}',
+            'message': f'Failed to manage image members: {e!s}',
             'error': str(e)
         }
 
 
-def set_image_metadata(action: str, image_name: str, **kwargs) -> Dict[str, Any]:
+def set_image_metadata(action: str, image_name: str, **kwargs) -> dict[str, Any]:
     """
     Manage OpenStack image metadata and properties
     
@@ -449,7 +448,7 @@ def set_image_metadata(action: str, image_name: str, **kwargs) -> Dict[str, Any]
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to show image metadata: {str(e)}'
+                    'message': f'Failed to show image metadata: {e!s}'
                 }
                 
         elif action.lower() == 'set':
@@ -472,7 +471,7 @@ def set_image_metadata(action: str, image_name: str, **kwargs) -> Dict[str, Any]
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to set image metadata: {str(e)}'
+                    'message': f'Failed to set image metadata: {e!s}'
                 }
         
         else:
@@ -485,12 +484,12 @@ def set_image_metadata(action: str, image_name: str, **kwargs) -> Dict[str, Any]
         logger.error(f"Failed to manage image metadata: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage image metadata: {str(e)}',
+            'message': f'Failed to manage image metadata: {e!s}',
             'error': str(e)
         }
 
 
-def set_image_visibility(action: str, image_name: str, **kwargs) -> Dict[str, Any]:
+def set_image_visibility(action: str, image_name: str, **kwargs) -> dict[str, Any]:
     """
     Manage OpenStack image visibility settings
     
@@ -558,7 +557,7 @@ def set_image_visibility(action: str, image_name: str, **kwargs) -> Dict[str, An
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to set image visibility: {str(e)}'
+                    'message': f'Failed to set image visibility: {e!s}'
                 }
         
         else:
@@ -571,6 +570,6 @@ def set_image_visibility(action: str, image_name: str, **kwargs) -> Dict[str, An
         logger.error(f"Failed to manage image visibility: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage image visibility: {str(e)}',
+            'message': f'Failed to manage image visibility: {e!s}',
             'error': str(e)
         }

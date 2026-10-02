@@ -2,12 +2,14 @@
 
 import json
 from datetime import datetime
+
 from ..functions import set_load_balancer_listener as _set_load_balancer_listener
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
     logger,
 )
+
 
 @conditional_tool
 async def set_load_balancer_listener(
@@ -60,7 +62,7 @@ async def set_load_balancer_listener(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -92,7 +94,7 @@ async def set_load_balancer_listener(
         return json.dumps(response, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage load balancer listener - {str(e)}"
+        error_msg = f"Error: Failed to manage load balancer listener - {e!s}"
         logger.error(error_msg)
         return json.dumps({
             "timestamp": datetime.now().isoformat(),

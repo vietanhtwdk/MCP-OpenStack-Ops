@@ -1,11 +1,13 @@
 """Tool implementation for set_image_metadata."""
 
 import json
+
 from ..functions import set_image_metadata as _set_image_metadata
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_image_metadata(
@@ -29,7 +31,7 @@ async def set_image_metadata(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -46,12 +48,12 @@ async def set_image_metadata(
     except json_lib.JSONDecodeError as e:
         return json.dumps({
             'success': False,
-            'message': f'Invalid JSON in properties parameter: {str(e)}',
+            'message': f'Invalid JSON in properties parameter: {e!s}',
             'error': str(e)
         }, indent=2)
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage image metadata: {str(e)}',
+            'message': f'Failed to manage image metadata: {e!s}',
             'error': str(e)
         }, indent=2)

@@ -7,6 +7,7 @@ from ..mcp_main import (
     logger,
 )
 
+
 @conditional_tool
 async def set_quota(
     project_name: str, 
@@ -90,6 +91,6 @@ async def set_quota(
         )
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage quota - {str(e)}"
+        error_msg = f"Error: Failed to manage quota - {e!s}"
         logger.error(error_msg)
         return error_msg

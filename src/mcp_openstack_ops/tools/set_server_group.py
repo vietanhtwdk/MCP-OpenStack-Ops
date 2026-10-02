@@ -1,6 +1,6 @@
 """Tool implementation for set_server_group."""
 
-from typing import Optional
+
 from ..functions import set_server_group as _set_server_group
 from ..mcp_main import (
     conditional_tool,
@@ -8,12 +8,13 @@ from ..mcp_main import (
     logger,
 )
 
+
 @conditional_tool
 async def set_server_group(
     group_name: str,
     action: str,
-    policies: Optional[str] = None,
-    metadata: Optional[str] = None
+    policies: str | None = None,
+    metadata: str | None = None
 ) -> str:
     """
     Manage server groups (create, delete, show)
@@ -53,6 +54,6 @@ async def set_server_group(
         )
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage server group - {str(e)}"
+        error_msg = f"Error: Failed to manage server group - {e!s}"
         logger.error(error_msg)
         return error_msg

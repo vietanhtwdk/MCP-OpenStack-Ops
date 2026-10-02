@@ -2,12 +2,14 @@
 
 import json
 from datetime import datetime
+
 from ..functions import set_server_security_group as _set_server_security_group
 from ..mcp_main import (
     conditional_tool,
     handle_operation_result,
     logger,
 )
+
 
 @conditional_tool
 async def set_server_security_group(
@@ -58,7 +60,7 @@ async def set_server_security_group(
         )
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage server security group - {str(e)}"
+        error_msg = f"Error: Failed to manage server security group - {e!s}"
         logger.error(error_msg)
         return json.dumps({
             "timestamp": datetime.now().isoformat(),

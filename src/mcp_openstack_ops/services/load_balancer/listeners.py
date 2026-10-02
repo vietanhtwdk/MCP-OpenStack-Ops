@@ -6,13 +6,14 @@ including creating, updating, deleting, and querying listeners.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any
+
 from ...connection import get_openstack_connection
 
 logger = logging.getLogger(__name__)
 
 
-def get_load_balancer_listeners(lb_name_or_id: str) -> Dict[str, Any]:
+def get_load_balancer_listeners(lb_name_or_id: str) -> dict[str, Any]:
     """
     Get listeners for a specific load balancer.
     
@@ -66,12 +67,12 @@ def get_load_balancer_listeners(lb_name_or_id: str) -> Dict[str, Any]:
         logger.error(f"Failed to get load balancer listeners: {e}")
         return {
             'success': False,
-            'message': f'Failed to get load balancer listeners: {str(e)}',
+            'message': f'Failed to get load balancer listeners: {e!s}',
             'error': str(e)
         }
 
 
-def set_load_balancer_listener(action: str, **kwargs) -> Dict[str, Any]:
+def set_load_balancer_listener(action: str, **kwargs) -> dict[str, Any]:
     """
     Comprehensive load balancer listener management operations.
     
@@ -261,7 +262,7 @@ def set_load_balancer_listener(action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to get listener statistics: {str(e)}'
+                    'message': f'Failed to get listener statistics: {e!s}'
                 }
         
         elif action == "show":
@@ -303,6 +304,6 @@ def set_load_balancer_listener(action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage listener: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage listener: {str(e)}',
+            'message': f'Failed to manage listener: {e!s}',
             'error': str(e)
         }

@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_network_details as _get_network_details
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_network_details(network_name: str = "all") -> str:
@@ -40,6 +42,6 @@ async def get_network_details(network_name: str = "all") -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to fetch network information - {str(e)}"
+        error_msg = f"Error: Failed to fetch network information - {e!s}"
         logger.error(error_msg)
         return error_msg

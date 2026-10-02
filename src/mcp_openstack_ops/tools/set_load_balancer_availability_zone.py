@@ -2,11 +2,15 @@
 
 import json
 from datetime import datetime
-from ..functions import set_load_balancer_availability_zone as _set_load_balancer_availability_zone
+
+from ..functions import (
+    set_load_balancer_availability_zone as _set_load_balancer_availability_zone,
+)
 from ..mcp_main import (
     conditional_tool,
     logger,
 )
+
 
 @conditional_tool
 async def set_load_balancer_availability_zone(
@@ -53,7 +57,7 @@ async def set_load_balancer_availability_zone(
         return json.dumps(response, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage availability zone - {str(e)}"
+        error_msg = f"Error: Failed to manage availability zone - {e!s}"
         logger.error(error_msg)
         return json.dumps({
             "timestamp": datetime.now().isoformat(),

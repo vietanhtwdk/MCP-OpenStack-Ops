@@ -1,6 +1,5 @@
 """Tool implementation for set_volume."""
 
-import json
 from ..functions import set_volume as _set_volume
 from ..mcp_main import (
     _get_resource_status_by_name,
@@ -8,6 +7,7 @@ from ..mcp_main import (
     handle_operation_result,
     logger,
 )
+
 
 @conditional_tool
 async def set_volume(volume_names: str, action: str, size: int = 1, instance_name: str = "", 
@@ -203,7 +203,7 @@ async def set_volume(volume_names: str, action: str, size: int = 1, instance_nam
                         
                 except Exception as e:
                     failures.append(volume_name)
-                    results.append(f"✗ {volume_name}: {str(e)}")
+                    results.append(f"✗ {volume_name}: {e!s}")
             
             # Post-action status verification for all processed volumes
             logger.info("Verifying post-action status for volumes")
@@ -242,6 +242,6 @@ async def set_volume(volume_names: str, action: str, size: int = 1, instance_nam
             return "\n".join(summary_parts)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage volume(s) '{volume_names}' - {str(e)}"
+        error_msg = f"Error: Failed to manage volume(s) '{volume_names}' - {e!s}"
         logger.error(error_msg)
         return error_msg

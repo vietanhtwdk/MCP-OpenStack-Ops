@@ -6,13 +6,14 @@ including availability zones, flavors, quotas, providers, and advanced operation
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any
+
 from ...connection import get_openstack_connection
 
 logger = logging.getLogger(__name__)
 
 
-def get_load_balancer_availability_zones() -> Dict[str, Any]:
+def get_load_balancer_availability_zones() -> dict[str, Any]:
     """
     Get load balancer availability zones.
     
@@ -44,12 +45,12 @@ def get_load_balancer_availability_zones() -> Dict[str, Any]:
         logger.error(f"Failed to get availability zones: {e}")
         return {
             'success': False,
-            'message': f'Failed to get availability zones: {str(e)}',
+            'message': f'Failed to get availability zones: {e!s}',
             'error': str(e)
         }
 
 
-def set_load_balancer_availability_zone(action: str, **kwargs) -> Dict[str, Any]:
+def set_load_balancer_availability_zone(action: str, **kwargs) -> dict[str, Any]:
     """
     Manage availability zone operations.
     
@@ -123,12 +124,12 @@ def set_load_balancer_availability_zone(action: str, **kwargs) -> Dict[str, Any]
         logger.error(f"Failed to manage availability zone: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage availability zone: {str(e)}',
+            'message': f'Failed to manage availability zone: {e!s}',
             'error': str(e)
         }
 
 
-def get_load_balancer_flavors() -> Dict[str, Any]:
+def get_load_balancer_flavors() -> dict[str, Any]:
     """
     Get load balancer flavors.
     
@@ -161,12 +162,12 @@ def get_load_balancer_flavors() -> Dict[str, Any]:
         logger.error(f"Failed to get flavors: {e}")
         return {
             'success': False,
-            'message': f'Failed to get flavors: {str(e)}',
+            'message': f'Failed to get flavors: {e!s}',
             'error': str(e)
         }
 
 
-def set_load_balancer_flavor(action: str, **kwargs) -> Dict[str, Any]:
+def set_load_balancer_flavor(action: str, **kwargs) -> dict[str, Any]:
     """
     Manage flavor operations.
     
@@ -241,12 +242,12 @@ def set_load_balancer_flavor(action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage flavor: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage flavor: {str(e)}',
+            'message': f'Failed to manage flavor: {e!s}',
             'error': str(e)
         }
 
 
-def get_load_balancer_providers() -> Dict[str, Any]:
+def get_load_balancer_providers() -> dict[str, Any]:
     """
     Get load balancer providers.
     
@@ -276,12 +277,12 @@ def get_load_balancer_providers() -> Dict[str, Any]:
         logger.error(f"Failed to get providers: {e}")
         return {
             'success': False,
-            'message': f'Failed to get providers: {str(e)}',
+            'message': f'Failed to get providers: {e!s}',
             'error': str(e)
         }
 
 
-def get_load_balancer_quotas(project_id: str = "") -> Dict[str, Any]:
+def get_load_balancer_quotas(project_id: str = "") -> dict[str, Any]:
     """
     Get load balancer quotas.
     
@@ -332,12 +333,12 @@ def get_load_balancer_quotas(project_id: str = "") -> Dict[str, Any]:
         logger.error(f"Failed to get quotas: {e}")
         return {
             'success': False,
-            'message': f'Failed to get quotas: {str(e)}',
+            'message': f'Failed to get quotas: {e!s}',
             'error': str(e)
         }
 
 
-def set_load_balancer_quota(action: str, **kwargs) -> Dict[str, Any]:
+def set_load_balancer_quota(action: str, **kwargs) -> dict[str, Any]:
     """
     Manage quota operations.
     
@@ -409,6 +410,6 @@ def set_load_balancer_quota(action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage quota: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage quota: {str(e)}',
+            'message': f'Failed to manage quota: {e!s}',
             'error': str(e)
         }

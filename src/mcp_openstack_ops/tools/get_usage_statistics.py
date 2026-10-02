@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_usage_statistics as _get_usage_statistics
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_usage_statistics(start_date: str = "", end_date: str = "") -> str:
@@ -45,6 +47,6 @@ async def get_usage_statistics(start_date: str = "", end_date: str = "") -> str:
         return json.dumps(response, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to fetch usage statistics - {str(e)}"
+        error_msg = f"Error: Failed to fetch usage statistics - {e!s}"
         logger.error(error_msg)
         return error_msg

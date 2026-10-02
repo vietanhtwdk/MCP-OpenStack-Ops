@@ -1,6 +1,6 @@
 """Tool implementation for set_server_volume."""
 
-from typing import Optional
+
 from ..functions import set_server_volume as _set_server_volume
 from ..mcp_main import (
     conditional_tool,
@@ -8,14 +8,15 @@ from ..mcp_main import (
     logger,
 )
 
+
 @conditional_tool
 async def set_server_volume(
     instance_name: str,
     action: str,
-    volume_id: Optional[str] = None,
-    volume_name: Optional[str] = None,
-    device: Optional[str] = None,
-    attachment_id: Optional[str] = None
+    volume_id: str | None = None,
+    volume_name: str | None = None,
+    device: str | None = None,
+    attachment_id: str | None = None
 ) -> str:
     """
     Manage server volume attachments (attach, detach, list)
@@ -64,6 +65,6 @@ async def set_server_volume(
         )
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage server volume - {str(e)}"
+        error_msg = f"Error: Failed to manage server volume - {e!s}"
         logger.error(error_msg)
         return error_msg

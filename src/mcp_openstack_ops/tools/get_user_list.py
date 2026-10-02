@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_user_list as _get_user_list
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_user_list() -> str:
@@ -37,6 +39,6 @@ async def get_user_list() -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to fetch user list - {str(e)}"
+        error_msg = f"Error: Failed to fetch user list - {e!s}"
         logger.error(error_msg)
         return error_msg

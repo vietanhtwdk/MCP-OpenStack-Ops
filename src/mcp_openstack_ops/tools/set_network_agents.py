@@ -1,11 +1,13 @@
 """Tool implementation for set_network_agents."""
 
 import json
+
 from ..functions import set_network_agents as _set_network_agents
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_network_agents(
@@ -27,7 +29,7 @@ async def set_network_agents(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -39,6 +41,6 @@ async def set_network_agents(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage network agent: {str(e)}',
+            'message': f'Failed to manage network agent: {e!s}',
             'error': str(e)
         }, indent=2)

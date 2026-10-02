@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime
+
 from ..functions import set_image as _set_image
 from ..mcp_main import (
     _get_resource_status_by_name,
@@ -9,6 +10,7 @@ from ..mcp_main import (
     handle_operation_result,
     logger,
 )
+
 
 @conditional_tool
 async def set_image(image_names: str, action: str, container_format: str = "bare", disk_format: str = "qcow2", 
@@ -176,7 +178,7 @@ async def set_image(image_names: str, action: str, container_format: str = "bare
                         
                 except Exception as e:
                     failures.append(image_name)
-                    results.append(f"✗ {image_name}: {str(e)}")
+                    results.append(f"✗ {image_name}: {e!s}")
             
             # Post-action status verification for all processed images
             logger.info("Verifying post-action status for images")
@@ -215,6 +217,6 @@ async def set_image(image_names: str, action: str, container_format: str = "bare
             return "\n".join(summary_parts)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage image(s) '{image_names}' - {str(e)}"
+        error_msg = f"Error: Failed to manage image(s) '{image_names}' - {e!s}"
         logger.error(error_msg)
         return error_msg

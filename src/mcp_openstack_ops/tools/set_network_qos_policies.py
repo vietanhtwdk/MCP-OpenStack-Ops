@@ -1,11 +1,13 @@
 """Tool implementation for set_network_qos_policies."""
 
 import json
+
 from ..functions import set_network_qos_policies as _set_network_qos_policies
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_network_qos_policies(
@@ -31,7 +33,7 @@ async def set_network_qos_policies(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -45,6 +47,6 @@ async def set_network_qos_policies(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage network QoS policy: {str(e)}',
+            'message': f'Failed to manage network QoS policy: {e!s}',
             'error': str(e)
         }, indent=2)

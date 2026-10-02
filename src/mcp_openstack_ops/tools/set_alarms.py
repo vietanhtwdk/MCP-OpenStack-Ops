@@ -1,11 +1,13 @@
 """Tool implementation for set_alarms."""
 
 import json
+
 from ..functions import set_alarms as _set_alarms
 from ..mcp_main import (
     _is_modify_operation_allowed,
     conditional_tool,
 )
+
 
 @conditional_tool
 async def set_alarms(
@@ -33,7 +35,7 @@ async def set_alarms(
         return json.dumps({
             'success': False,
             'message': f'Modify operations are not allowed in current environment for action: {action}',
-            'error': f'MODIFY_OPERATIONS_DISABLED'
+            'error': 'MODIFY_OPERATIONS_DISABLED'
         })
     
     try:
@@ -48,6 +50,6 @@ async def set_alarms(
     except Exception as e:
         return json.dumps({
             'success': False,
-            'message': f'Failed to manage alarms: {str(e)}',
+            'message': f'Failed to manage alarms: {e!s}',
             'error': str(e)
         }, indent=2)

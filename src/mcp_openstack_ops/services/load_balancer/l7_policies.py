@@ -6,13 +6,14 @@ for load balancers, including creating, updating, deleting, and querying L7 poli
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any
+
 from ...connection import get_openstack_connection
 
 logger = logging.getLogger(__name__)
 
 
-def get_load_balancer_l7_policies(listener_name_or_id: str = "") -> Dict[str, Any]:
+def get_load_balancer_l7_policies(listener_name_or_id: str = "") -> dict[str, Any]:
     """
     Get L7 policies for a listener or all policies.
     
@@ -67,12 +68,12 @@ def get_load_balancer_l7_policies(listener_name_or_id: str = "") -> Dict[str, An
         logger.error(f"Failed to get L7 policies: {e}")
         return {
             'success': False,
-            'message': f'Failed to get L7 policies: {str(e)}',
+            'message': f'Failed to get L7 policies: {e!s}',
             'error': str(e)
         }
 
 
-def set_load_balancer_l7_policy(action: str, **kwargs) -> Dict[str, Any]:
+def set_load_balancer_l7_policy(action: str, **kwargs) -> dict[str, Any]:
     """
     Manage L7 policy operations.
     
@@ -121,7 +122,7 @@ def set_load_balancer_l7_policy(action: str, **kwargs) -> Dict[str, Any]:
             
             return {
                 'success': True,
-                'message': f'L7 policy created successfully',
+                'message': 'L7 policy created successfully',
                 'l7_policy': {
                     'id': policy.id,
                     'name': policy.name,
@@ -161,12 +162,12 @@ def set_load_balancer_l7_policy(action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage L7 policy: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage L7 policy: {str(e)}',
+            'message': f'Failed to manage L7 policy: {e!s}',
             'error': str(e)
         }
 
 
-def get_load_balancer_l7_rules(policy_name_or_id: str) -> Dict[str, Any]:
+def get_load_balancer_l7_rules(policy_name_or_id: str) -> dict[str, Any]:
     """
     Get L7 rules for a specific L7 policy.
     
@@ -219,12 +220,12 @@ def get_load_balancer_l7_rules(policy_name_or_id: str) -> Dict[str, Any]:
         logger.error(f"Failed to get L7 rules: {e}")
         return {
             'success': False,
-            'message': f'Failed to get L7 rules: {str(e)}',
+            'message': f'Failed to get L7 rules: {e!s}',
             'error': str(e)
         }
 
 
-def set_load_balancer_l7_rule(action: str, **kwargs) -> Dict[str, Any]:
+def set_load_balancer_l7_rule(action: str, **kwargs) -> dict[str, Any]:
     """
     Manage L7 rule operations.
     
@@ -274,7 +275,7 @@ def set_load_balancer_l7_rule(action: str, **kwargs) -> Dict[str, Any]:
             
             return {
                 'success': True,
-                'message': f'L7 rule created successfully',
+                'message': 'L7 rule created successfully',
                 'l7_rule': {
                     'id': rule.id,
                     'type': rule.type,
@@ -316,6 +317,6 @@ def set_load_balancer_l7_rule(action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage L7 rule: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage L7 rule: {str(e)}',
+            'message': f'Failed to manage L7 rule: {e!s}',
             'error': str(e)
         }

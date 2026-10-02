@@ -5,14 +5,91 @@ This module contains functions for managing projects, users, roles, domains, and
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Any
+
 from ..connection import get_openstack_connection
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
-def set_domains(action: str, domain_name: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+def _resource_get(resource: Any, key: str, default: Any = None) -> Any:
+    """Safely read a key from dict-like OpenStack SDK resources."""
+    if resource is None:
+        return default
+
+    if isinstance(resource, dict):
+        value = resource.get(key, default)
+    elif hasattr(resource, "get"):
+        try:
+            value = resource.get(key, default)
+        except Exception:
+            value = getattr(resource, key, default)
+    else:
+        value = getattr(resource, key, default)
+
+    return default if value is None else value
+
+
+def _resource_id(resource: Any) -> str:
+    """Return a resource ID from a nested Keystone object or N/A."""
+    return _resource_get(resource, "id", "N/A")
+
+
+def _parse_role_assignment(assignment: Any, current_project_id: str | None = None) -> dict[str, Any]:
+    """Parse one Keystone role assignment without assuming a user actor."""
+    user_info = _resource_get(assignment, "user", {}) or {}
+    group_info = _resource_get(assignment, "group", {}) or {}
+    role_info = _resource_get(assignment, "role", {}) or {}
+    scope = _resource_get(assignment, "scope", {}) or {}
+
+    user_id = _resource_id(user_info)
+    group_id = _resource_id(group_info)
+
+    if user_id != "N/A":
+        actor_type = "user"
+    elif group_id != "N/A":
+        actor_type = "group"
+    else:
+        actor_type = "unknown"
+
+    project_id = "N/A"
+    domain_id = "N/A"
+    system_scope = "N/A"
+    scope_type = "unknown"
+
+    project_scope = _resource_get(scope, "project")
+    domain_scope = _resource_get(scope, "domain")
+    system = _resource_get(scope, "system")
+
+    if project_scope:
+        scope_type = "project"
+        project_id = _resource_id(project_scope)
+    elif domain_scope:
+        scope_type = "domain"
+        domain_id = _resource_id(domain_scope)
+    elif system:
+        scope_type = "system"
+        system_scope = _resource_get(system, "all", system)
+
+    return {
+        "actor_type": actor_type,
+        "user_id": user_id,
+        "user_name": _resource_get(user_info, "name", "N/A"),
+        "group_id": group_id,
+        "group_name": _resource_get(group_info, "name", "N/A"),
+        "project_id": project_id,
+        "project_name": _resource_get(project_scope, "name", "N/A"),
+        "domain_id": domain_id,
+        "system_scope": system_scope,
+        "role_id": _resource_id(role_info),
+        "role_name": _resource_get(role_info, "name", "N/A"),
+        "scope_type": scope_type,
+        "in_current_project": project_id == current_project_id if current_project_id else False,
+    }
+
+
+def set_domains(action: str, domain_name: str | None = None, **kwargs) -> dict[str, Any]:
     """
     Manage OpenStack domains (list, show,             # Calculate compute resources
             resources['compute']['instances'] = len(project_instances)
@@ -66,7 +143,7 @@ def set_domains(action: str, domain_name: Optional[str] = None, **kwargs) -> Dic
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Domains not accessible: {str(e)}',
+                    'message': f'Domains not accessible: {e!s}',
                     'domains': []
                 }
             return {
@@ -100,7 +177,7 @@ def set_domains(action: str, domain_name: Optional[str] = None, **kwargs) -> Dic
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to create domain: {str(e)}'
+                    'message': f'Failed to create domain: {e!s}'
                 }
         
         else:
@@ -113,12 +190,12 @@ def set_domains(action: str, domain_name: Optional[str] = None, **kwargs) -> Dic
         logger.error(f"Failed to manage domain: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage domain: {str(e)}',
+            'message': f'Failed to manage domain: {e!s}',
             'error': str(e)
         }
 
 
-def get_project_info() -> Dict[str, Any]:
+def get_project_info() -> dict[str, Any]:
     """
     Get information about the current OpenStack project/tenant.
     
@@ -176,7 +253,7 @@ def get_project_info() -> Dict[str, Any]:
         return {'error': str(e), 'name': 'unknown-project', 'id': 'unknown'}
 
 
-def get_user_list() -> List[Dict[str, Any]]:
+def get_user_list() -> list[dict[str, Any]]:
     """
     Get list of users in the current project scope.
     
@@ -185,22 +262,43 @@ def get_user_list() -> List[Dict[str, Any]]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection
+        from ..connection import get_openstack_connection, is_all_projects_allowed
         conn = get_openstack_connection()
         current_project_id = conn.current_project_id
         users = []
-        
-        # Get role assignments for current project first
+
+        all_projects = is_all_projects_allowed()
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - listing users across all projects")
+
+        # Get direct and group-derived user assignments for the current project
+        # (or every project, if all_projects mode is enabled).
         current_project_users = set()
-        for assignment in conn.identity.role_assignments():
-            scope = getattr(assignment, 'scope', {})
-            if 'project' in scope and scope['project'].get('id') == current_project_id:
-                user_info = getattr(assignment, 'user', {})
-                user_id = user_info.get('id')
-                if user_id:
-                    current_project_users.add(user_id)
-        
-        # Get user details only for users in current project
+        current_project_groups = set()
+        for assignment in conn.identity.role_assignments(include_names=True):
+            try:
+                parsed = _parse_role_assignment(assignment, current_project_id)
+            except Exception as assignment_e:
+                logger.warning(f"Skipping malformed role assignment while building user list: {assignment_e} - {assignment}")
+                continue
+
+            if not all_projects and not parsed["in_current_project"]:
+                continue
+
+            if parsed["user_id"] != "N/A":
+                current_project_users.add(parsed["user_id"])
+            elif parsed["group_id"] != "N/A":
+                current_project_groups.add(parsed["group_id"])
+
+        for group_id in current_project_groups:
+            try:
+                for user in conn.identity.group_users(group_id):
+                    if getattr(user, "id", None):
+                        current_project_users.add(user.id)
+            except Exception as group_e:
+                logger.warning(f"Could not retrieve users for group {group_id}: {group_e}")
+
+        # Get user details only for users in scope (current project, or all projects)
         for user in conn.identity.users():
             if user.id in current_project_users:
                 users.append({
@@ -216,18 +314,15 @@ def get_user_list() -> List[Dict[str, Any]]:
         return users
     except Exception as e:
         logger.error(f"Failed to get user list: {e}")
-        return [
-            {'id': 'user-1', 'name': 'demo-user', 'email': 'demo@example.com', 
-             'enabled': True, 'error': str(e)}
-        ]
+        return []
 
 
-def get_role_assignments() -> List[Dict[str, Any]]:
+def get_role_assignments() -> list[dict[str, Any]]:
     """
-    Get role assignments for the current project only.
+    Get visible role assignments for the current Keystone scope.
     
     Returns:
-        List of role assignment dictionaries for current project
+        List of role assignment dictionaries
     """
     try:
         # Import here to avoid circular imports
@@ -235,29 +330,20 @@ def get_role_assignments() -> List[Dict[str, Any]]:
         conn = get_openstack_connection()
         current_project_id = conn.current_project_id
         assignments = []
-        
-        for assignment in conn.identity.role_assignments():
-            scope = getattr(assignment, 'scope', {})
-            # Only include assignments for current project
-            if 'project' in scope and scope['project'].get('id') == current_project_id:
-                assignments.append({
-                    'user_id': getattr(assignment, 'user', {}).get('id', 'N/A'),
-                    'project_id': scope['project'].get('id', 'N/A'),
-                    'role_id': getattr(assignment, 'role', {}).get('id', 'N/A'),
-                    'role_name': getattr(assignment, 'role', {}).get('name', 'N/A'),
-                    'scope_type': ['project']
-                })
+
+        for assignment in conn.identity.role_assignments(include_names=True):
+            try:
+                assignments.append(_parse_role_assignment(assignment, current_project_id))
+            except Exception as assignment_e:
+                logger.warning(f"Skipping malformed role assignment: {assignment_e} - {assignment}")
         
         return assignments
     except Exception as e:
         logger.error(f"Failed to get role assignments: {e}")
-        return [
-            {'user_id': 'user-1', 'project_id': 'project-1', 'role_id': 'role-1', 
-             'role_name': 'member', 'error': str(e)}
-        ]
+        return []
 
 
-def get_keypair_list() -> List[Dict[str, Any]]:
+def get_keypair_list() -> list[dict[str, Any]]:
     """
     Get list of SSH keypairs for the current project.
     
@@ -287,7 +373,7 @@ def get_keypair_list() -> List[Dict[str, Any]]:
         ]
 
 
-def set_keypair(keypair_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_keypair(keypair_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage SSH keypairs (create, delete, list).
     
@@ -355,7 +441,7 @@ def set_keypair(keypair_name: str, action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to delete keypair "{keypair_name}": {str(e)}'
+                    'message': f'Failed to delete keypair "{keypair_name}": {e!s}'
                 }
         
         elif action.lower() == 'show':
@@ -374,7 +460,7 @@ def set_keypair(keypair_name: str, action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Keypair "{keypair_name}" not found: {str(e)}'
+                    'message': f'Keypair "{keypair_name}" not found: {e!s}'
                 }
         
         else:
@@ -387,12 +473,12 @@ def set_keypair(keypair_name: str, action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage keypair: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage keypair: {str(e)}',
+            'message': f'Failed to manage keypair: {e!s}',
             'error': str(e)
         }
 
 
-def get_project_details(project_name: str = "") -> Dict[str, Any]:
+def get_project_details(project_name: str = "") -> dict[str, Any]:
     """
     Get detailed information about the current project scope.
     
@@ -404,24 +490,45 @@ def get_project_details(project_name: str = "") -> Dict[str, Any]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection
+        from ..connection import get_openstack_connection, is_all_projects_allowed
         conn = get_openstack_connection()
-        
-        # Get current project information
-        current_project_id = conn.current_project_id
-        current_project = conn.identity.get_project(current_project_id)
-        
-        # If specific project name is requested, validate it matches current project
-        if project_name and current_project.name != project_name:
+
+        # If a specific project name is requested, look it up directly via the
+        # Keystone project directory - this works regardless of which project
+        # the current token happens to be scoped to.
+        if project_name:
+            for project in conn.identity.projects():
+                if project.name == project_name:
+                    project_detail = _get_single_project_details(conn, project)
+                    return {
+                        'success': True,
+                        'total_projects': 1,
+                        'projects': [project_detail],
+                        'message': f'Retrieved details for project: {project.name}',
+                        'scope': 'single-project'
+                    }
             return {
                 'success': False,
-                'message': f'Project {project_name} not accessible. Current scope: {current_project.name}',
-                'current_project': current_project.name
+                'message': f'Project "{project_name}" not found'
             }
-        
-        # Get detailed information for current project only
+
+        if is_all_projects_allowed():
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - listing all projects")
+            projects = list(conn.identity.projects())
+            project_details = [_get_single_project_details(conn, p) for p in projects]
+            return {
+                'success': True,
+                'total_projects': len(project_details),
+                'projects': project_details,
+                'message': f'Retrieved details for all {len(project_details)} projects',
+                'scope': 'all-projects'
+            }
+
+        # Default: current project only
+        current_project_id = conn.current_project_id
+        current_project = conn.identity.get_project(current_project_id)
         project_detail = _get_single_project_details(conn, current_project)
-        
+
         return {
             'success': True,
             'total_projects': 1,
@@ -441,12 +548,12 @@ def get_project_details(project_name: str = "") -> Dict[str, Any]:
         logger.error(f"Failed to get project details: {e}")
         return {
             'success': False,
-            'message': f'Failed to get project details: {str(e)}',
+            'message': f'Failed to get project details: {e!s}',
             'error': str(e)
         }
 
 
-def _get_single_project_details(conn, project) -> Dict[str, Any]:
+def _get_single_project_details(conn, project) -> dict[str, Any]:
     """
     Helper function to get detailed information for a single project.
     
@@ -462,15 +569,20 @@ def _get_single_project_details(conn, project) -> Dict[str, Any]:
         users = []
         try:
             for assignment in conn.identity.role_assignments():
-                scope = getattr(assignment, 'scope', {})
-                if 'project' in scope and scope['project'].get('id') == project.id:
-                    user_info = getattr(assignment, 'user', {})
-                    role_info = getattr(assignment, 'role', {})
+                try:
+                    parsed = _parse_role_assignment(assignment, project.id)
+                except Exception as assignment_e:
+                    logger.warning(f"Skipping malformed project role assignment: {assignment_e} - {assignment}")
+                    continue
+
+                if parsed["in_current_project"]:
                     users.append({
-                        'user_id': user_info.get('id', 'N/A'),
-                        'user_name': user_info.get('name', 'N/A'),
-                        'role_id': role_info.get('id', 'N/A'),
-                        'role_name': role_info.get('name', 'N/A')
+                        'actor_type': parsed["actor_type"],
+                        'user_id': parsed["user_id"],
+                        'group_id': parsed["group_id"],
+                        'user_name': 'N/A',
+                        'role_id': parsed["role_id"],
+                        'role_name': parsed["role_name"]
                     })
         except Exception as user_e:
             logger.warning(f"Could not retrieve project users: {user_e}")
@@ -563,7 +675,7 @@ def _get_single_project_details(conn, project) -> Dict[str, Any]:
         }
 
 
-def set_project(project_name: str, action: str, **kwargs) -> Dict[str, Any]:
+def set_project(project_name: str, action: str, **kwargs) -> dict[str, Any]:
     """
     Manage OpenStack projects (create, delete, update, show).
     
@@ -596,7 +708,7 @@ def set_project(project_name: str, action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to list projects: {str(e)}',
+                    'message': f'Failed to list projects: {e!s}',
                     'projects': []
                 }
             return {
@@ -630,7 +742,7 @@ def set_project(project_name: str, action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to create project "{project_name}": {str(e)}'
+                    'message': f'Failed to create project "{project_name}": {e!s}'
                 }
                 
         elif action.lower() == 'delete':
@@ -656,7 +768,7 @@ def set_project(project_name: str, action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to delete project "{project_name}": {str(e)}'
+                    'message': f'Failed to delete project "{project_name}": {e!s}'
                 }
                 
         elif action.lower() == 'update':
@@ -694,7 +806,7 @@ def set_project(project_name: str, action: str, **kwargs) -> Dict[str, Any]:
             except Exception as e:
                 return {
                     'success': False,
-                    'message': f'Failed to update project "{project_name}": {str(e)}'
+                    'message': f'Failed to update project "{project_name}": {e!s}'
                 }
                 
         elif action.lower() == 'show':
@@ -736,6 +848,6 @@ def set_project(project_name: str, action: str, **kwargs) -> Dict[str, Any]:
         logger.error(f"Failed to manage project: {e}")
         return {
             'success': False,
-            'message': f'Failed to manage project: {str(e)}',
+            'message': f'Failed to manage project: {e!s}',
             'error': str(e)
         }

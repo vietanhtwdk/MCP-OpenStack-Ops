@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..functions import get_instances_by_status as _get_instances_by_status
 from ..mcp_main import (
     logger,
     mcp,
 )
+
 
 @mcp.tool()
 async def get_instances_by_status(status: str) -> str:
@@ -34,6 +36,6 @@ async def get_instances_by_status(status: str) -> str:
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to get instances with status '{status}' - {str(e)}"
+        error_msg = f"Error: Failed to get instances with status '{status}' - {e!s}"
         logger.error(error_msg)
         return error_msg

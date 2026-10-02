@@ -2,11 +2,13 @@
 
 import json
 from datetime import datetime
+
 from ..mcp_main import (
     logger,
     mcp,
 )
 from ..services.compute import search_instances as _search_instances
+
 
 @mcp.tool()
 async def search_instances(
@@ -80,11 +82,11 @@ async def search_instances(
         return json.dumps(result, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to search instances - {str(e)}"
+        error_msg = f"Error: Failed to search instances - {e!s}"
         logger.error(error_msg)
         return error_msg
         
     except Exception as e:
-        error_msg = f"Error: Failed to search instances - {str(e)}"
+        error_msg = f"Error: Failed to search instances - {e!s}"
         logger.error(error_msg)
         return error_msg

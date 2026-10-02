@@ -1,13 +1,14 @@
 """Tool implementation for set_heat_stack."""
 
-import json
 from datetime import datetime
+
 from ..functions import set_heat_stack as _set_heat_stack
 from ..mcp_main import (
     conditional_tool,
     handle_operation_result,
     logger,
 )
+
 
 @conditional_tool
 async def set_heat_stack(stack_names: str, action: str, template: str = "", parameters: str = "") -> str:
@@ -130,7 +131,7 @@ async def set_heat_stack(stack_names: str, action: str, template: str = "", para
                         
                 except Exception as e:
                     failures.append(stack_name)
-                    results.append(f"✗ {stack_name}: {str(e)}")
+                    results.append(f"✗ {stack_name}: {e!s}")
             
             # Prepare summary
             summary_parts = [
@@ -151,6 +152,6 @@ async def set_heat_stack(stack_names: str, action: str, template: str = "", para
             return "\n".join(summary_parts)
         
     except Exception as e:
-        error_msg = f"Error: Failed to manage stack(s) '{stack_names}' - {str(e)}"
+        error_msg = f"Error: Failed to manage stack(s) '{stack_names}' - {e!s}"
         logger.error(error_msg)
         return error_msg

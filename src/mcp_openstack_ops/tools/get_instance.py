@@ -2,8 +2,11 @@
 
 import json
 from datetime import datetime
+
 from ..functions import (
     get_instance_details as _get_instance_details,
+)
+from ..functions import (
     get_instances_by_status as _get_instances_by_status,
 )
 from ..mcp_main import (
@@ -11,6 +14,7 @@ from ..mcp_main import (
     mcp,
 )
 from ..services.compute import search_instances as _search_instances
+
 
 @mcp.tool()
 async def get_instance(
@@ -182,6 +186,6 @@ async def get_instance(
         return json.dumps(result_data, indent=2, ensure_ascii=False)
         
     except Exception as e:
-        error_msg = f"Error: Failed to query instances - {str(e)}"
+        error_msg = f"Error: Failed to query instances - {e!s}"
         logger.error(error_msg)
         return error_msg

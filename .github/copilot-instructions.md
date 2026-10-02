@@ -21,6 +21,11 @@
 - **Always test**: Tool visibility with both `ALLOW_MODIFY_OPERATIONS=true` and `ALLOW_MODIFY_OPERATIONS=false`
 - **Pattern**: Read-only tools use `@mcp.tool()`, modify tools use `@conditional_tool`
 
+### **Refactor Scope Rule:**
+- **MANDATORY**: Refactor read-only information paths first: `get_*`, `search_*`, monitoring, status, listing, detail, and query code.
+- **DO NOT TOUCH**: `set_*`, create, update, delete, modify, attach, detach, failover, backup, restore, migration, quota-changing, or other mutating paths unless the user explicitly asks for those changes.
+- **MANDATORY**: Keep refactors scoped to source code that only retrieves or formats information from OpenStack.
+
 ---
 
 ## Architecture Overview

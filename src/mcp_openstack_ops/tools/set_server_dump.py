@@ -2,12 +2,14 @@
 
 import json
 from datetime import datetime
+
 from ..functions import create_server_dump as _set_server_dump
 from ..mcp_main import (
     conditional_tool,
     handle_operation_result,
     logger,
 )
+
 
 @conditional_tool
 async def set_server_dump(instance_name: str) -> str:
@@ -45,7 +47,7 @@ async def set_server_dump(instance_name: str) -> str:
         )
         
     except Exception as e:
-        error_msg = f"Error: Failed to create server dump - {str(e)}"
+        error_msg = f"Error: Failed to create server dump - {e!s}"
         logger.error(error_msg)
         return json.dumps({
             "timestamp": datetime.now().isoformat(),
