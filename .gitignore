@@ -19,6 +19,9 @@ wheels/
 #.github/copilot-instructions.md
 *.swp
 
+# Windows download metadata (ADS marker) - ':' in filename breaks Windows clones
+*:Zone.Identifier
+
 # Company-internal tooling / infra notes - not for this fork
 .githooks/
 audit-prompt.md
