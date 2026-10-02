@@ -203,10 +203,13 @@ def get_resource_monitoring() -> dict[str, Any]:
     """
     try:
         # Import here to avoid circular imports
-        from ..connection import get_openstack_connection
+        from ..connection import get_openstack_connection, is_all_projects_allowed
         conn = get_openstack_connection()
         current_project_id = conn.current_project_id
-        
+        all_projects = is_all_projects_allowed()
+        if all_projects:
+            logger.warning("OS_ALLOW_ALL_PROJECTS enabled - resource monitoring computed across all projects")
+
         monitoring_data = {
             'timestamp': datetime.now().isoformat(),
             'project_id': current_project_id,
@@ -215,11 +218,10 @@ def get_resource_monitoring() -> dict[str, Any]:
             'storage': {},
             'identity': {}
         }
-        
+
         # Compute monitoring - filter servers by project
         try:
-            all_servers = list(conn.compute.servers())
-            servers = [s for s in all_servers if getattr(s, 'project_id', None) == current_project_id]
+            servers = list(conn.compute.servers(all_projects=all_projects))
             
             # Calculate actual compute usage from instances
             total_used_vcpus = 0
@@ -251,61 +253,28 @@ def get_resource_monitoring() -> dict[str, Any]:
                     total_used_ram_mb += ram_mb
                     total_used_disk_gb += total_instance_disk
             
-            # Try to get hypervisor totals (physical capacity)
-            total_physical_vcpus = 0
-            total_physical_ram_mb = 0
-            total_physical_disk_gb = 0
-            hypervisor_count = 0
-            
+            # Physical capacity, from real per-hypervisor stats (same source as
+            # get_hypervisor_details) rather than quota limits, which describe
+            # a project's allowance, not actual hardware capacity.
+            hypervisor_totals = _new_hypervisor_totals()
             try:
-                hypervisors = list(conn.compute.hypervisors())
-                hypervisor_count = len(hypervisors)
-                
-                # Since hypervisor detailed stats are not available in this environment,
-                # try to get quota limits as a reasonable approximation of capacity
-                try:
-                    quota = conn.compute.get_quota_set(current_project_id)
-                    # Use quota limits as approximate capacity indicators
-                    if hasattr(quota, 'cores') and quota.cores and quota.cores > 0:
-                        total_physical_vcpus = quota.cores
-                    if hasattr(quota, 'ram') and quota.ram and quota.ram > 0:
-                        total_physical_ram_mb = quota.ram
-                        
-                except Exception as quota_error:
-                    logger.info(f"Could not get quota for capacity estimation: {quota_error}")
-                
-                # Alternative: Try to get aggregate/availability zone stats
-                try:
-                    # Some deployments provide compute service stats
-                    services = list(conn.compute.services(binary='nova-compute'))
-                    if services and hypervisor_count > 0:
-                        # Rough estimation: assume each compute service represents similar capacity
-                        # This is just a fallback when hypervisor stats aren't available
-                        if total_physical_vcpus == 0:
-                            # Very rough estimate: if we can't get real data, 
-                            # assume some reasonable default per hypervisor
-                            estimated_vcpus_per_hypervisor = max(total_used_vcpus * 2, 8)  # At least double usage or 8
-                            total_physical_vcpus = estimated_vcpus_per_hypervisor * hypervisor_count
-                            
-                        if total_physical_ram_mb == 0:
-                            estimated_ram_per_hypervisor = max(total_used_ram_mb * 2, 16384)  # At least double usage or 16GB
-                            total_physical_ram_mb = estimated_ram_per_hypervisor * hypervisor_count
-                            
-                except Exception:
-                    pass
-                    
-            except Exception:
-                # If hypervisor access fails, we'll still show instance usage
-                pass
-            
+                for hypervisor in conn.compute.hypervisors(
+                    details=True,
+                    microversion=HYPERVISOR_CAPACITY_MICROVERSION,
+                ):
+                    _add_hypervisor_to_totals(hypervisor_totals, _format_hypervisor(hypervisor))
+            except Exception as hypervisor_error:
+                logger.warning(f"Could not get hypervisor capacity stats: {hypervisor_error}")
+            hypervisor_totals = _finalize_hypervisor_totals(hypervisor_totals)
+
             compute_stats = {
                 'total_servers': len(servers),
                 'running_servers': running_servers,
-                'total_hypervisors': hypervisor_count,
+                'total_hypervisors': hypervisor_totals['count'],
                 # Physical capacity (from hypervisors)
-                'total_vcpus': total_physical_vcpus,
-                'total_memory_mb': total_physical_ram_mb,
-                'total_disk_gb': total_physical_disk_gb,
+                'total_vcpus': hypervisor_totals['vcpus'],
+                'total_memory_mb': hypervisor_totals['memory_mb'],
+                'total_disk_gb': hypervisor_totals['local_gb'],
                 # Usage (from instances)
                 'used_vcpus': total_used_vcpus,
                 'used_memory_mb': total_used_ram_mb,
@@ -363,11 +332,9 @@ def get_resource_monitoring() -> dict[str, Any]:
         
         # Storage monitoring - filter by project
         try:
-            all_volumes = list(conn.volume.volumes())
-            all_snapshots = list(conn.volume.snapshots())
-            
-            volumes = [v for v in all_volumes if getattr(v, 'project_id', None) == current_project_id]
-            snapshots = [s for s in all_snapshots if getattr(s, 'project_id', None) == current_project_id]
+            volume_kwargs = {"all_tenants": True} if all_projects else {}
+            volumes = list(conn.volume.volumes(**volume_kwargs))
+            snapshots = list(conn.volume.snapshots(**volume_kwargs))
             
             storage_stats = {
                 'total_volumes': len(volumes),
@@ -687,12 +654,16 @@ def get_quota(project_name: str = "") -> dict[str, Any]:
             total_ram = 0
             
             for instance in instances:
-                try:
-                    flavor = conn.compute.get_flavor(instance.flavor['id'])
-                    total_cores += getattr(flavor, 'vcpus', 0)
-                    total_ram += getattr(flavor, 'ram', 0)
-                except Exception:
-                    pass
+                # Server responses embed flavor vcpus/ram directly - no need for
+                # (and no reliable way to do) a separate get_flavor() lookup,
+                # since instance.flavor['id'] is not always a real flavor ID.
+                flavor_info = getattr(instance, 'flavor', None) or {}
+                if isinstance(flavor_info, dict):
+                    total_cores += flavor_info.get('vcpus', 0) or 0
+                    total_ram += flavor_info.get('ram', 0) or 0
+                else:
+                    total_cores += getattr(flavor_info, 'vcpus', 0) or 0
+                    total_ram += getattr(flavor_info, 'ram', 0) or 0
             
             keypairs = list(conn.compute.keypairs())
             
@@ -850,6 +821,7 @@ def get_hypervisor_details(hypervisor_name: str = "all") -> dict[str, Any]:
                         'running_vms': hypervisor_statistics.get('running_vms'),
                         'data_source': 'nova_hypervisor_statistics_api',
                         'microversion': HYPERVISOR_CAPACITY_MICROVERSION,
+                        'note': 'Nova excludes hypervisors with a disabled compute service from this count - lower than total_stats.count is expected, not a bug.',
                     }
         except Exception as e:
             logger.warning(f"Could not retrieve hypervisor statistics API data: {e}")
@@ -858,7 +830,7 @@ def get_hypervisor_details(hypervisor_name: str = "all") -> dict[str, Any]:
             'success': True,
             'microversion': HYPERVISOR_CAPACITY_MICROVERSION,
             'data_source': 'nova_os_hypervisors_detail',
-            'total_stats': total_stats,
+            'total_stats': {**total_stats, 'note': 'Counts every hypervisor returned by the detail API, including ones with a disabled compute service.'},
             'enhanced_stats': enhanced_stats,
         }
 

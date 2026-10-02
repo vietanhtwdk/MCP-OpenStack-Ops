@@ -568,7 +568,7 @@ def _get_single_project_details(conn, project) -> dict[str, Any]:
         # Get project users and roles
         users = []
         try:
-            for assignment in conn.identity.role_assignments():
+            for assignment in conn.identity.role_assignments(include_names=True):
                 try:
                     parsed = _parse_role_assignment(assignment, project.id)
                 except Exception as assignment_e:
@@ -579,8 +579,9 @@ def _get_single_project_details(conn, project) -> dict[str, Any]:
                     users.append({
                         'actor_type': parsed["actor_type"],
                         'user_id': parsed["user_id"],
+                        'user_name': parsed["user_name"],
                         'group_id': parsed["group_id"],
-                        'user_name': 'N/A',
+                        'group_name': parsed["group_name"],
                         'role_id': parsed["role_id"],
                         'role_name': parsed["role_name"]
                     })
@@ -597,17 +598,20 @@ def _get_single_project_details(conn, project) -> dict[str, Any]:
         }
         
         try:
-            # Get all resources and filter by project
-            all_instances = list(conn.compute.servers())
-            all_volumes = list(conn.volume.volumes())
+            # Nova/Cinder silently ignore a bare project_id filter and fall back
+            # to the token's own project unless all_projects/all_tenants is also
+            # set - scope these directly to the target project rather than
+            # fetching everything and filtering client-side.
+            project_instances = list(conn.compute.servers(project_id=project.id, all_projects=True))
+            project_volumes = list(conn.volume.volumes(project_id=project.id, all_tenants=True))
+
+            # Neutron already returns resources across every project for an
+            # admin token with no special flag, so client-side filtering works.
             all_floating_ips = list(conn.network.ips())
-            all_networks = list(conn.network.networks()) 
+            all_networks = list(conn.network.networks())
             all_ports = list(conn.network.ports())
             all_routers = list(conn.network.routers())
-            
-            # Filter by project ID
-            project_instances = [inst for inst in all_instances if getattr(inst, 'project_id', None) == project.id]
-            project_volumes = [vol for vol in all_volumes if getattr(vol, 'project_id', None) == project.id]
+
             project_floating_ips = [fip for fip in all_floating_ips if getattr(fip, 'project_id', None) == project.id]
             project_networks = [net for net in all_networks if getattr(net, 'project_id', None) == project.id]
             project_ports = [port for port in all_ports if getattr(port, 'project_id', None) == project.id]
@@ -636,8 +640,7 @@ def _get_single_project_details(conn, project) -> dict[str, Any]:
             
             # Try to get snapshots (may need special handling)
             try:
-                all_snapshots = list(conn.volume.snapshots())
-                project_snapshots = [snap for snap in all_snapshots if getattr(snap, 'project_id', None) == project.id]
+                project_snapshots = list(conn.volume.snapshots(project_id=project.id, all_tenants=True))
                 resources['volume']['snapshots'] = len(project_snapshots)
             except Exception:
                 resources['volume']['snapshots'] = 0

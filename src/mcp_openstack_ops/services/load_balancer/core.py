@@ -68,7 +68,7 @@ def get_load_balancer_list(limit: int = 50, offset: int = 0, include_all: bool =
                         'name': listener.name,
                         'protocol': listener.protocol,
                         'protocol_port': listener.protocol_port,
-                        'admin_state_up': listener.admin_state_up
+                        'admin_state_up': listener.is_admin_state_up
                     }
                     listener_summary.append(listener_info)
                 
@@ -82,7 +82,7 @@ def get_load_balancer_list(limit: int = 50, offset: int = 0, include_all: bool =
                     'vip_network_id': lb.vip_network_id,
                     'provisioning_status': lb.provisioning_status,
                     'operating_status': lb.operating_status,
-                    'admin_state_up': lb.admin_state_up,
+                    'admin_state_up': lb.is_admin_state_up,
                     'project_id': lb.project_id,
                     'provider': getattr(lb, 'provider', 'Unknown'),
                     'created_at': str(lb.created_at) if hasattr(lb, 'created_at') else 'N/A',
@@ -171,7 +171,7 @@ def get_load_balancer_details(lb_name_or_id: str) -> dict[str, Any]:
             'vip_network_id': lb.vip_network_id,
             'provisioning_status': lb.provisioning_status,
             'operating_status': lb.operating_status,
-            'admin_state_up': lb.admin_state_up,
+            'admin_state_up': lb.is_admin_state_up,
             'project_id': lb.project_id,
             'provider': getattr(lb, 'provider', 'Unknown'),
             'created_at': str(lb.created_at) if hasattr(lb, 'created_at') else 'N/A',
@@ -197,7 +197,7 @@ def get_load_balancer_details(lb_name_or_id: str) -> dict[str, Any]:
                     'name': pool.name,
                     'protocol': pool.protocol,
                     'lb_algorithm': pool.lb_algorithm,
-                    'admin_state_up': pool.admin_state_up,
+                    'admin_state_up': pool.is_admin_state_up,
                     'members': member_summary,
                     'member_count': len(member_summary)
                 }
@@ -208,7 +208,7 @@ def get_load_balancer_details(lb_name_or_id: str) -> dict[str, Any]:
                 'name': listener.name,
                 'protocol': listener.protocol,
                 'protocol_port': listener.protocol_port,
-                'admin_state_up': listener.admin_state_up,
+                'admin_state_up': listener.is_admin_state_up,
                 'pools': pool_summary,
                 'pool_count': len(pool_summary)
             }
@@ -340,7 +340,7 @@ def set_load_balancer(action: str, **kwargs) -> dict[str, Any]:
                     'id': updated_lb.id,
                     'name': updated_lb.name,
                     'description': updated_lb.description,
-                    'admin_state_up': updated_lb.admin_state_up
+                    'admin_state_up': updated_lb.is_admin_state_up
                 }
             }
         
@@ -462,7 +462,7 @@ def set_load_balancer(action: str, **kwargs) -> dict[str, Any]:
                         'name': lb.name,
                         'provisioning_status': lb.provisioning_status,
                         'operating_status': lb.operating_status,
-                        'admin_state_up': lb.admin_state_up,
+                        'admin_state_up': lb.is_admin_state_up,
                         'vip_address': lb.vip_address
                     }
                 }

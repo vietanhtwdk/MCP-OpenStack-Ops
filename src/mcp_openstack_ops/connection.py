@@ -121,10 +121,9 @@ def get_openstack_connection():
             volume_endpoint=f"{os_auth_protocol}://{os_auth_host}:{volume_port}/v3",
             image_endpoint=f"{os_auth_protocol}://{os_auth_host}:{image_port}",
             placement_endpoint=f"{os_auth_protocol}://{os_auth_host}:{placement_port}",
-            orchestration_endpoint=f"{os_auth_protocol}://{os_auth_host}:{heat_stack_port}/v1",
             timeout=10
         )
-        
+
         # Test the connection
         try:
             token = _connection_cache.identity.get_token()
@@ -132,7 +131,21 @@ def get_openstack_connection():
         except Exception as test_e:
             logger.error(f"Connection test failed: {test_e}")
             raise
-            
+
+        # Heat's v1 API embeds the project ID in the URL path itself
+        # (/v1/{project_id}/stacks), unlike every other service here, so it
+        # can only be built after authentication tells us the project ID.
+        # Guarded separately: environments without Heat deployed raise here
+        # just from accessing the proxy, which must not break the connection
+        # as a whole for every other service.
+        try:
+            project_id = _connection_cache.current_project_id
+            _connection_cache.orchestration.endpoint_override = (
+                f"{os_auth_protocol}://{os_auth_host}:{heat_stack_port}/v1/{project_id}"
+            )
+        except Exception as heat_e:
+            logger.debug(f"Heat/orchestration endpoint not configured (service likely unavailable): {heat_e}")
+
         return _connection_cache
     except Exception as e:
         logger.error(f"Failed to create OpenStack connection: {e}")

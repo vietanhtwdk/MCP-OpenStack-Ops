@@ -52,7 +52,7 @@ def get_load_balancer_l7_policies(listener_name_or_id: str = "") -> dict[str, An
                 'position': policy.position,
                 'redirect_pool_id': getattr(policy, 'redirect_pool_id', None),
                 'redirect_url': getattr(policy, 'redirect_url', None),
-                'admin_state_up': policy.admin_state_up,
+                'admin_state_up': policy.is_admin_state_up,
                 'provisioning_status': policy.provisioning_status,
                 'operating_status': policy.operating_status
             }
@@ -200,7 +200,7 @@ def get_load_balancer_l7_rules(policy_name_or_id: str) -> dict[str, Any]:
                 'key': getattr(rule, 'key', None),
                 'value': rule.value,
                 'invert': getattr(rule, 'invert', False),
-                'admin_state_up': rule.admin_state_up,
+                'admin_state_up': rule.is_admin_state_up,
                 'provisioning_status': rule.provisioning_status,
                 'operating_status': rule.operating_status
             }
